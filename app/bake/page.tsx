@@ -97,14 +97,22 @@ export default function BakePage() {
           width: COMP_W,
           height: COMP_H,
           position: "relative",
-          backgroundColor: "#0A0A0A",
+          backgroundColor: "#000",
           overflow: "hidden",
         }}
       >
         <LightPillar
-          topColor="#F5F5F5"
-          bottomColor="#9A9A9A"
+          topColor="#a2a0a9"
+          bottomColor="#797679"
+          intensity={1}
+          rotationSpeed={0.3}
+          glowAmount={0.002}
+          pillarWidth={3}
+          pillarHeight={0.4}
+          noiseIntensity={0.5}
+          pillarRotation={25}
           interactive={false}
+          mixBlendMode="screen"
           quality="high"
         />
       </div>
