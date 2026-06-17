@@ -25,6 +25,7 @@ const DEFAULTS = {
   scale: lightRayDefaultProps.artworkScale,
   radius: lightRayDefaultProps.artworkRadius,
   centerY: lightRayDefaultProps.artworkCenterY,
+  shadow: lightRayDefaultProps.artworkShadow,
 };
 
 const SliderRow: React.FC<{
@@ -84,6 +85,7 @@ export const Studio: React.FC = () => {
   const [artworkCenterY, setArtworkCenterY] = useState<number>(
     DEFAULTS.centerY,
   );
+  const [artworkShadow, setArtworkShadow] = useState<number>(DEFAULTS.shadow);
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [canExport, setCanExport] = useState<boolean | null>(null);
@@ -120,6 +122,7 @@ export const Studio: React.FC = () => {
       artworkScale,
       artworkRadius,
       artworkCenterY,
+      artworkShadow,
     }),
     [
       artworkUrl,
@@ -128,6 +131,7 @@ export const Studio: React.FC = () => {
       artworkScale,
       artworkRadius,
       artworkCenterY,
+      artworkShadow,
     ],
   );
 
@@ -135,12 +139,14 @@ export const Studio: React.FC = () => {
     setArtworkScale(DEFAULTS.scale);
     setArtworkRadius(DEFAULTS.radius);
     setArtworkCenterY(DEFAULTS.centerY);
+    setArtworkShadow(DEFAULTS.shadow);
   };
 
   const isAtDefaults =
     artworkScale === DEFAULTS.scale &&
     artworkRadius === DEFAULTS.radius &&
-    artworkCenterY === DEFAULTS.centerY;
+    artworkCenterY === DEFAULTS.centerY &&
+    artworkShadow === DEFAULTS.shadow;
 
   const onFile = useCallback((file: File) => {
     setArtworkName(file.name);
@@ -361,6 +367,15 @@ export const Studio: React.FC = () => {
               step={0.01}
               valueNumber={artworkCenterY}
               onChange={setArtworkCenterY}
+            />
+            <SliderRow
+              label="Shadow"
+              value={`${Math.round(artworkShadow * 100)}%`}
+              min={0}
+              max={1}
+              step={0.01}
+              valueNumber={artworkShadow}
+              onChange={setArtworkShadow}
             />
           </div>
         </aside>

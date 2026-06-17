@@ -10,6 +10,7 @@ export type LightRayProps = {
   artworkScale: number;
   artworkRadius: number;
   artworkCenterY: number;
+  artworkShadow: number;
 };
 
 export const lightRayDefaultProps: LightRayProps = {
@@ -20,6 +21,7 @@ export const lightRayDefaultProps: LightRayProps = {
   artworkScale: 1,
   artworkRadius: 32,
   artworkCenterY: 0.47,
+  artworkShadow: 0.5,
 };
 
 // Composition canvas
@@ -52,12 +54,18 @@ export const LightRay: React.FC<LightRayProps> = ({
   artworkScale,
   artworkRadius,
   artworkCenterY,
+  artworkShadow,
 }) => {
   const { w: baseW, h: baseH } = fitBox(artworkAspect);
   const boxW = baseW * artworkScale;
   const boxH = baseH * artworkScale;
   const left = (COMP_W - boxW) / 2;
   const top = artworkCenterY * COMP_H - boxH / 2;
+
+  const shadow =
+    artworkShadow > 0
+      ? `0 ${24 * artworkShadow}px ${64 * artworkShadow}px rgba(0,0,0,${0.6 * artworkShadow})`
+      : "none";
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
@@ -86,6 +94,7 @@ export const LightRay: React.FC<LightRayProps> = ({
               height: boxH,
               borderRadius: artworkRadius,
               overflow: "hidden",
+              boxShadow: shadow,
             }}
           >
             <Img
