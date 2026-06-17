@@ -6,37 +6,35 @@ import { Header } from "./_components/Header";
 export default function Home() {
   return (
     <div
-      className="flex min-h-screen flex-col"
+      className="flex min-h-screen flex-col md:h-screen md:min-h-0 md:overflow-hidden"
       style={{ backgroundColor: BRAND.colors.paper }}
     >
       <Header />
 
-      {/* Hero */}
-      <section className="px-6 pt-20 md:pt-32">
-        <div className="mx-auto max-w-2xl">
+      <main className="flex flex-1 flex-col items-center px-6 py-12 md:min-h-0 md:py-6">
+        {/* Hero */}
+        <section className="mx-auto max-w-2xl text-center">
           <h1
-            className="font-display text-5xl leading-[1.05] tracking-tight md:text-6xl"
+            className="font-display text-5xl leading-[1.05] tracking-tight"
             style={{ color: BRAND.colors.ink }}
           >
             Present art in motion.
           </h1>
           <p
-            className="mt-6 font-sans text-base md:text-lg"
+            className="mt-4 font-sans text-base"
             style={{ color: BRAND.colors.grey500 }}
           >
             Drop in a piece, pick a treatment, export a clean 9:16 reel.
             <br />
             No editing.
           </p>
-        </div>
-      </section>
+        </section>
 
-      {/* Template cards */}
-      <section className="px-6 pt-16 pb-24 md:pt-24">
-        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Template cards */}
+        <section className="mt-10 grid w-full max-w-4xl grid-cols-1 gap-6 md:mt-6 md:min-h-0 md:flex-1 md:grid-cols-2">
           {/* Card 1 — Light Ray */}
           <article
-            className="flex flex-col gap-5 rounded-xl p-6"
+            className="flex flex-col gap-4 rounded-xl p-5 md:min-h-0 md:gap-3 md:p-4"
             style={{
               backgroundColor: "#FFFFFF",
               border: `1px solid ${BRAND.colors.grey200}`,
@@ -59,23 +57,20 @@ export default function Home() {
                 Beta
               </span>
             </div>
-            <div
-              className="overflow-hidden rounded-lg"
-              style={{ aspectRatio: "9 / 16", backgroundColor: "#000" }}
-            >
-              <video
-                src="/rays/light-ray-white.mp4"
-                muted
-                autoPlay
-                loop
-                playsInline
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
+            <div className="flex justify-center md:min-h-0 md:flex-1">
+              <div
+                className="w-full overflow-hidden rounded-lg aspect-[9/16] md:h-full md:w-auto"
+                style={{ backgroundColor: "#000" }}
+              >
+                <video
+                  src="/rays/light-ray-white.mp4"
+                  muted
+                  autoPlay
+                  loop
+                  playsInline
+                  className="block h-full w-full object-cover"
+                />
+              </div>
             </div>
             <Button asChild className="w-full rounded-full font-sans">
               <Link href="/studio">Add your art →</Link>
@@ -84,7 +79,7 @@ export default function Home() {
 
           {/* Card 2 — Coming soon */}
           <article
-            className="flex flex-col gap-5 rounded-xl p-6"
+            className="flex flex-col gap-4 rounded-xl p-5 md:min-h-0 md:gap-3 md:p-4"
             style={{
               backgroundColor: "#FFFFFF",
               border: `1px solid ${BRAND.colors.grey200}`,
@@ -107,17 +102,19 @@ export default function Home() {
                 Coming soon
               </span>
             </div>
-            <div
-              className="rounded-lg"
-              style={{ aspectRatio: "9 / 16", backgroundColor: "#1F1F1F" }}
-              aria-hidden
-            />
+            <div className="flex justify-center md:min-h-0 md:flex-1">
+              <div
+                className="w-full rounded-lg aspect-[9/16] md:h-full md:w-auto"
+                style={{ backgroundColor: "#1F1F1F" }}
+                aria-hidden
+              />
+            </div>
             <Button disabled className="w-full rounded-full font-sans">
               Add your art
             </Button>
           </article>
-        </div>
-      </section>
+        </section>
+      </main>
     </div>
   );
 }
