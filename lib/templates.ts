@@ -21,6 +21,13 @@ export const TEMPLATES: readonly Template[] = [
     background: "/rays/ferrofluid-white.mp4",
     preview: "/rays/ferrofluid-white.mp4",
   },
+  {
+    id: "light-pillar",
+    compositionId: "LightPillar",
+    label: "Light Pillar",
+    background: "/rays/light-pillar-white.mp4",
+    preview: "/rays/light-pillar-white.mp4",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;

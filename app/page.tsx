@@ -32,7 +32,7 @@ export default function Home() {
         </section>
 
         {/* Template cards */}
-        <section className="mt-10 grid w-full max-w-4xl grid-cols-1 gap-6 md:mt-6 md:min-h-0 md:flex-1 md:grid-cols-2">
+        <section className="mt-10 grid w-full max-w-5xl grid-cols-1 gap-6 md:mt-6 md:min-h-0 md:flex-1 md:grid-cols-3">
           {TEMPLATES.map((t) => (
             <article
               key={t.id}
