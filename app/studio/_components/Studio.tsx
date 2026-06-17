@@ -14,7 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 import { AUDIO_TRACKS } from "@/lib/audio-tracks";
-import { LightRay, lightRayDefaultProps } from "@/remotion/LightRay";
+import { Reel, reelDefaultProps } from "@/remotion/Reel";
+import { getTemplate } from "@/lib/templates";
+import { useSearchParams } from "next/navigation";
 import { Header } from "../../_components/Header";
 
 const NO_AUDIO = "__none__";
@@ -22,10 +24,10 @@ const PLAYER_WIDTH = 380;
 const PLAYER_HEIGHT = (PLAYER_WIDTH * 1920) / 1080;
 
 const DEFAULTS = {
-  scale: lightRayDefaultProps.artworkScale,
-  radius: lightRayDefaultProps.artworkRadius,
-  centerY: lightRayDefaultProps.artworkCenterY,
-  shadow: lightRayDefaultProps.artworkShadow,
+  scale: reelDefaultProps.artworkScale,
+  radius: reelDefaultProps.artworkRadius,
+  centerY: reelDefaultProps.artworkCenterY,
+  shadow: reelDefaultProps.artworkShadow,
 };
 
 const SliderRow: React.FC<{
@@ -65,17 +67,28 @@ const SliderRow: React.FC<{
   </div>
 );
 
-const COMPOSITION_META = {
-  id: "LightRay" as const,
-  component: LightRay,
-  durationInFrames: 450,
-  fps: 30,
-  width: 1080,
-  height: 1920,
-  defaultProps: lightRayDefaultProps,
-} as const;
+const COMP_W = 1080;
+const COMP_H = 1920;
+const COMP_DURATION = 450;
+const COMP_FPS = 30;
 
 export const Studio: React.FC = () => {
+  const searchParams = useSearchParams();
+  const template = getTemplate(searchParams.get("template"));
+
+  const compositionMeta = useMemo(
+    () => ({
+      id: template.compositionId,
+      component: Reel,
+      durationInFrames: COMP_DURATION,
+      fps: COMP_FPS,
+      width: COMP_W,
+      height: COMP_H,
+      defaultProps: { ...reelDefaultProps, backgroundSrc: template.background },
+    }),
+    [template],
+  );
+
   const [artworkUrl, setArtworkUrl] = useState<string>("");
   const [artworkAspect, setArtworkAspect] = useState<number>(1);
   const [artworkName, setArtworkName] = useState<string>("");
@@ -97,8 +110,8 @@ export const Studio: React.FC = () => {
     canRenderMediaOnWeb({
       container: "mp4",
       videoCodec: "h264",
-      width: COMPOSITION_META.width,
-      height: COMPOSITION_META.height,
+      width: COMP_W,
+      height: COMP_H,
     })
       .then((r) => {
         if (!cancelled) setCanExport(r.canRender);
@@ -119,6 +132,7 @@ export const Studio: React.FC = () => {
       artworkAspect,
       audioTrack,
       brand: BRAND,
+      backgroundSrc: template.background,
       artworkScale,
       artworkRadius,
       artworkCenterY,
@@ -128,6 +142,7 @@ export const Studio: React.FC = () => {
       artworkUrl,
       artworkAspect,
       audioTrack,
+      template.background,
       artworkScale,
       artworkRadius,
       artworkCenterY,
@@ -188,7 +203,7 @@ export const Studio: React.FC = () => {
     setProgress(0);
     try {
       const { getBlob } = await renderMediaOnWeb({
-        composition: COMPOSITION_META,
+        composition: compositionMeta,
         inputProps,
         licenseKey: "free-license",
         videoBitrate: 12_000_000,
@@ -387,11 +402,11 @@ export const Studio: React.FC = () => {
         >
           {artworkUrl ? (
             <Player
-              component={LightRay}
-              durationInFrames={COMPOSITION_META.durationInFrames}
-              fps={COMPOSITION_META.fps}
-              compositionWidth={COMPOSITION_META.width}
-              compositionHeight={COMPOSITION_META.height}
+              component={Reel}
+              durationInFrames={COMP_DURATION}
+              fps={COMP_FPS}
+              compositionWidth={COMP_W}
+              compositionHeight={COMP_H}
               controls
               loop
               inputProps={inputProps}

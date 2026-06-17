@@ -2,22 +2,24 @@ import { AbsoluteFill, Img, staticFile } from "remotion";
 import { Audio, Video } from "@remotion/media";
 import { BRAND, type Brand } from "../lib/brand";
 
-export type LightRayProps = {
+export type ReelProps = {
   artworkSrc: string;
   artworkAspect: number;
   audioTrack: string;
   brand: Brand;
+  backgroundSrc: string;
   artworkScale: number;
   artworkRadius: number;
   artworkCenterY: number;
   artworkShadow: number;
 };
 
-export const lightRayDefaultProps: LightRayProps = {
+export const reelDefaultProps: ReelProps = {
   artworkSrc: "artwork/placeholder.svg",
   artworkAspect: 1,
   audioTrack: "",
   brand: BRAND,
+  backgroundSrc: "/rays/light-ray-white.mp4",
   artworkScale: 1,
   artworkRadius: 32,
   artworkCenterY: 0.47,
@@ -46,11 +48,12 @@ const fitBox = (aspect: number): { w: number; h: number } => {
   return { w: MAX_H * a, h: MAX_H };
 };
 
-export const LightRay: React.FC<LightRayProps> = ({
+export const Reel: React.FC<ReelProps> = ({
   artworkSrc,
   artworkAspect,
   audioTrack,
   brand,
+  backgroundSrc,
   artworkScale,
   artworkRadius,
   artworkCenterY,
@@ -69,10 +72,10 @@ export const LightRay: React.FC<LightRayProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      {/* Layer 1 (back): light-ray background */}
+      {/* Layer 1 (back): pre-baked background video (light-ray, ferrofluid, …) */}
       <AbsoluteFill>
         <Video
-          src={staticFile("rays/light-ray-white.mp4")}
+          src={resolveSrc(backgroundSrc)}
           muted
           objectFit="cover"
           style={{
@@ -110,7 +113,7 @@ export const LightRay: React.FC<LightRayProps> = ({
         ) : null}
       </AbsoluteFill>
 
-      {/* Layer 3 (front): Zincad logo, fixed TOP-RIGHT, ~6% width */}
+      {/* Layer 3 (front): brand logo, fixed TOP-RIGHT, ~6% width */}
       <AbsoluteFill>
         <Img
           src={resolveSrc(brand.logoSrc)}

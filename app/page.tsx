@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
+import { TEMPLATES } from "@/lib/templates";
 import { Header } from "./_components/Header";
 
 export default function Home() {
@@ -32,87 +33,52 @@ export default function Home() {
 
         {/* Template cards */}
         <section className="mt-10 grid w-full max-w-4xl grid-cols-1 gap-6 md:mt-6 md:min-h-0 md:flex-1 md:grid-cols-2">
-          {/* Card 1 — Light Ray */}
-          <article
-            className="flex flex-col gap-4 rounded-xl p-5 md:min-h-0 md:gap-3 md:p-4"
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: `1px solid ${BRAND.colors.grey200}`,
-            }}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <h2
-                className="font-display text-2xl tracking-tight"
-                style={{ color: BRAND.colors.ink }}
-              >
-                Light Ray
-              </h2>
-              <span
-                className="rounded-full px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wider"
-                style={{
-                  backgroundColor: BRAND.colors.ink,
-                  color: BRAND.colors.paper,
-                }}
-              >
-                Beta
-              </span>
-            </div>
-            <div className="flex justify-center md:min-h-0 md:flex-1">
-              <div
-                className="w-full overflow-hidden rounded-lg aspect-[9/16] md:h-full md:w-auto"
-                style={{ backgroundColor: "#000" }}
-              >
-                <video
-                  src="/rays/light-ray-white.mp4"
-                  muted
-                  autoPlay
-                  loop
-                  playsInline
-                  className="block h-full w-full object-cover"
-                />
+          {TEMPLATES.map((t) => (
+            <article
+              key={t.id}
+              className="flex flex-col gap-4 rounded-xl p-5 md:min-h-0 md:gap-3 md:p-4"
+              style={{
+                backgroundColor: "#FFFFFF",
+                border: `1px solid ${BRAND.colors.grey200}`,
+              }}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <h2
+                  className="font-display text-2xl tracking-tight"
+                  style={{ color: BRAND.colors.ink }}
+                >
+                  {t.label}
+                </h2>
+                <span
+                  className="rounded-full px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wider"
+                  style={{
+                    backgroundColor: BRAND.colors.ink,
+                    color: BRAND.colors.paper,
+                  }}
+                >
+                  Beta
+                </span>
               </div>
-            </div>
-            <Button asChild className="w-full rounded-full font-sans">
-              <Link href="/studio">Add your art →</Link>
-            </Button>
-          </article>
-
-          {/* Card 2 — Coming soon */}
-          <article
-            className="flex flex-col gap-4 rounded-xl p-5 md:min-h-0 md:gap-3 md:p-4"
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: `1px solid ${BRAND.colors.grey200}`,
-            }}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <h2
-                className="font-display text-2xl tracking-tight"
-                style={{ color: BRAND.colors.grey500 }}
-              >
-                Coming soon
-              </h2>
-              <span
-                className="rounded-full px-2 py-0.5 font-sans text-[10px] font-medium uppercase tracking-wider"
-                style={{
-                  backgroundColor: BRAND.colors.grey500,
-                  color: BRAND.colors.paper,
-                }}
-              >
-                Coming soon
-              </span>
-            </div>
-            <div className="flex justify-center md:min-h-0 md:flex-1">
-              <div
-                className="w-full rounded-lg aspect-[9/16] md:h-full md:w-auto"
-                style={{ backgroundColor: "#1F1F1F" }}
-                aria-hidden
-              />
-            </div>
-            <Button disabled className="w-full rounded-full font-sans">
-              Add your art
-            </Button>
-          </article>
+              <div className="flex justify-center md:min-h-0 md:flex-1">
+                <div
+                  className="w-full overflow-hidden rounded-lg aspect-[9/16] md:h-full md:w-auto"
+                  style={{ backgroundColor: "#000" }}
+                >
+                  <video
+                    src={t.preview}
+                    muted
+                    autoPlay
+                    loop
+                    playsInline
+                    className="block h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+              <Button asChild className="w-full rounded-full font-sans">
+                <Link href={`/studio?template=${t.id}`}>Add your art →</Link>
+              </Button>
+            </article>
+          ))}
         </section>
       </main>
     </div>
