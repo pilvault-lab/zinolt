@@ -21,6 +21,49 @@ const NO_AUDIO = "__none__";
 const PLAYER_WIDTH = 380;
 const PLAYER_HEIGHT = (PLAYER_WIDTH * 1920) / 1080;
 
+const DEFAULTS = {
+  scale: lightRayDefaultProps.artworkScale,
+  radius: lightRayDefaultProps.artworkRadius,
+  centerY: lightRayDefaultProps.artworkCenterY,
+};
+
+const SliderRow: React.FC<{
+  label: string;
+  value: string;
+  min: number;
+  max: number;
+  step: number;
+  valueNumber: number;
+  onChange: (v: number) => void;
+}> = ({ label, value, min, max, step, valueNumber, onChange }) => (
+  <div className="flex flex-col gap-1.5">
+    <div className="flex items-baseline justify-between">
+      <span
+        className="font-sans text-xs"
+        style={{ color: BRAND.colors.ink }}
+      >
+        {label}
+      </span>
+      <span
+        className="font-sans text-[11px] tabular-nums"
+        style={{ color: BRAND.colors.grey500 }}
+      >
+        {value}
+      </span>
+    </div>
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={valueNumber}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="w-full"
+      style={{ accentColor: BRAND.colors.ink }}
+    />
+  </div>
+);
+
 const COMPOSITION_META = {
   id: "LightRay" as const,
   component: LightRay,
@@ -36,6 +79,11 @@ export const Studio: React.FC = () => {
   const [artworkAspect, setArtworkAspect] = useState<number>(1);
   const [artworkName, setArtworkName] = useState<string>("");
   const [audioSelection, setAudioSelection] = useState<string>(NO_AUDIO);
+  const [artworkScale, setArtworkScale] = useState<number>(DEFAULTS.scale);
+  const [artworkRadius, setArtworkRadius] = useState<number>(DEFAULTS.radius);
+  const [artworkCenterY, setArtworkCenterY] = useState<number>(
+    DEFAULTS.centerY,
+  );
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [canExport, setCanExport] = useState<boolean | null>(null);
@@ -69,9 +117,30 @@ export const Studio: React.FC = () => {
       artworkAspect,
       audioTrack,
       brand: BRAND,
+      artworkScale,
+      artworkRadius,
+      artworkCenterY,
     }),
-    [artworkUrl, artworkAspect, audioTrack],
+    [
+      artworkUrl,
+      artworkAspect,
+      audioTrack,
+      artworkScale,
+      artworkRadius,
+      artworkCenterY,
+    ],
   );
+
+  const resetArtwork = () => {
+    setArtworkScale(DEFAULTS.scale);
+    setArtworkRadius(DEFAULTS.radius);
+    setArtworkCenterY(DEFAULTS.centerY);
+  };
+
+  const isAtDefaults =
+    artworkScale === DEFAULTS.scale &&
+    artworkRadius === DEFAULTS.radius &&
+    artworkCenterY === DEFAULTS.centerY;
 
   const onFile = useCallback((file: File) => {
     setArtworkName(file.name);
@@ -239,6 +308,60 @@ export const Studio: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <label
+                className="font-sans text-xs uppercase tracking-wide"
+                style={{ color: BRAND.colors.grey500 }}
+              >
+                Artwork
+              </label>
+              <button
+                type="button"
+                onClick={resetArtwork}
+                disabled={isAtDefaults}
+                className="font-sans text-[11px] underline-offset-2 transition-colors hover:underline disabled:cursor-default disabled:no-underline"
+                style={{
+                  color: isAtDefaults
+                    ? BRAND.colors.grey200
+                    : BRAND.colors.grey500,
+                  background: "none",
+                  padding: 0,
+                }}
+              >
+                Reset
+              </button>
+            </div>
+
+            <SliderRow
+              label="Size"
+              value={`${Math.round(artworkScale * 100)}%`}
+              min={0.5}
+              max={1.2}
+              step={0.01}
+              valueNumber={artworkScale}
+              onChange={setArtworkScale}
+            />
+            <SliderRow
+              label="Corner"
+              value={`${artworkRadius}px`}
+              min={0}
+              max={80}
+              step={1}
+              valueNumber={artworkRadius}
+              onChange={setArtworkRadius}
+            />
+            <SliderRow
+              label="Position"
+              value={`${Math.round(artworkCenterY * 100)}%`}
+              min={0.25}
+              max={0.7}
+              step={0.01}
+              valueNumber={artworkCenterY}
+              onChange={setArtworkCenterY}
+            />
           </div>
         </aside>
 

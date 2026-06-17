@@ -7,6 +7,9 @@ export type LightRayProps = {
   artworkAspect: number;
   audioTrack: string;
   brand: Brand;
+  artworkScale: number;
+  artworkRadius: number;
+  artworkCenterY: number;
 };
 
 export const lightRayDefaultProps: LightRayProps = {
@@ -14,20 +17,19 @@ export const lightRayDefaultProps: LightRayProps = {
   artworkAspect: 1,
   audioTrack: "",
   brand: BRAND,
+  artworkScale: 1,
+  artworkRadius: 32,
+  artworkCenterY: 0.47,
 };
 
 // Composition canvas
 const COMP_W = 1080;
 const COMP_H = 1920;
 
-// Artwork bounding box (fit-contain math against these — see fitBox)
+// Artwork bounding box at scale=1 (fit-contain math against these — see fitBox)
 const MAX_W = 0.6 * COMP_W; // 648
 const MAX_H = 0.55 * COMP_H; // 1056
 const REF_ASPECT = MAX_W / MAX_H;
-
-// Easy dials
-const ART_RADIUS = 32;
-const ART_CENTER_Y = 0.47; // fraction of COMP_H where the artwork's vertical center sits
 
 const isAbsoluteUrl = (s: string) => /^(blob:|data:|https?:|file:)/i.test(s);
 const stripLeadingSlash = (p: string) => p.replace(/^\//, "");
@@ -47,10 +49,15 @@ export const LightRay: React.FC<LightRayProps> = ({
   artworkAspect,
   audioTrack,
   brand,
+  artworkScale,
+  artworkRadius,
+  artworkCenterY,
 }) => {
-  const { w: boxW, h: boxH } = fitBox(artworkAspect);
+  const { w: baseW, h: baseH } = fitBox(artworkAspect);
+  const boxW = baseW * artworkScale;
+  const boxH = baseH * artworkScale;
   const left = (COMP_W - boxW) / 2;
-  const top = ART_CENTER_Y * COMP_H - boxH / 2;
+  const top = artworkCenterY * COMP_H - boxH / 2;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
@@ -77,7 +84,7 @@ export const LightRay: React.FC<LightRayProps> = ({
               top,
               width: boxW,
               height: boxH,
-              borderRadius: ART_RADIUS,
+              borderRadius: artworkRadius,
               overflow: "hidden",
             }}
           >
