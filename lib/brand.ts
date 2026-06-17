@@ -17,6 +17,7 @@ export const BRAND = {
     },
   },
   logoSrc: "/brand/zinolt-logo-white.png",
+  iconSrc: "/brand/zinolt-icon.jpg",
 } as const;
 
 export type Brand = typeof BRAND;

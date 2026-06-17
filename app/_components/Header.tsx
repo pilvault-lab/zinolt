@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 
@@ -12,15 +13,14 @@ export const Header: React.FC<{ right?: React.ReactNode }> = ({ right }) => {
       }}
     >
       <Link href="/" className="flex items-center gap-2 no-underline">
-        <span
+        <Image
+          src={BRAND.iconSrc}
+          alt=""
           aria-hidden
-          style={{
-            width: 16,
-            height: 16,
-            backgroundColor: BRAND.colors.ink,
-            borderRadius: 3,
-            display: "inline-block",
-          }}
+          width={28}
+          height={28}
+          priority
+          style={{ borderRadius: 6, display: "block" }}
         />
         <span
           className="font-display text-2xl tracking-tight"
