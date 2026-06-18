@@ -25,8 +25,8 @@ export const TEMPLATES: readonly Template[] = [
     id: "light-pillar",
     compositionId: "LightPillar",
     label: "Light Pillar",
-    background: "/rays/light-pillar-white-v2.mp4",
-    preview: "/rays/light-pillar-white-v2.mp4",
+    background: "/rays/light-pillar-white-v3.mp4",
+    preview: "/rays/light-pillar-white-v3.mp4",
   },
 ] as const;
 

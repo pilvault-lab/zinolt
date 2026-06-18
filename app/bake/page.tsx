@@ -7,7 +7,7 @@ const COMP_W = 1080;
 const COMP_H = 1920;
 const RECORD_SECONDS = 18; // record over composition length; trim to 15s via ffmpeg
 const RECORD_FPS = 30;
-const VIDEO_BITS_PER_SECOND = 16_000_000;
+const VIDEO_BITS_PER_SECOND = 32_000_000;
 
 export default function BakePage() {
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -105,7 +105,7 @@ export default function BakePage() {
           topColor="#a2a0a9"
           bottomColor="#797679"
           intensity={1}
-          rotationSpeed={0.3}
+          rotationSpeed={0.4}
           glowAmount={0.002}
           pillarWidth={3}
           pillarHeight={0.4}
