@@ -47,3 +47,5 @@ next-env.d.ts
 # scratch screenshots
 /before-click.png
 /studio-after.png
+
+.vercel
