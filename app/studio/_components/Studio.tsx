@@ -196,6 +196,22 @@ export const Studio: React.FC = () => {
     if (f) onFile(f);
   };
 
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) onFile(file);
+          break;
+        }
+      }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [onFile]);
+
   const handleDownload = useCallback(async () => {
     if (!artworkUrl) return;
     setExportError("");
@@ -301,7 +317,7 @@ export const Studio: React.FC = () => {
                   className="font-sans text-xs"
                   style={{ color: BRAND.colors.grey500 }}
                 >
-                  click to browse · PNG, JPG, WebP
+                  click to browse · paste · PNG, JPG, WebP
                 </p>
               </div>
             )}
