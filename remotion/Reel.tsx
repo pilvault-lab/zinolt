@@ -1,6 +1,19 @@
-import { AbsoluteFill, Img, staticFile } from "remotion";
+import { AbsoluteFill, continueRender, delayRender, Img, staticFile } from "remotion";
 import { Audio, Video } from "@remotion/media";
 import { BRAND, type Brand } from "../lib/brand";
+
+const _fontHandle = delayRender("Cosmos Oracle font");
+const _face = new FontFace(
+  "Cosmos Oracle",
+  `url(${staticFile("brand/Cosmos-Oracle.woff2")}) format('woff2')`,
+);
+_face
+  .load()
+  .then(() => {
+    document.fonts.add(_face);
+    continueRender(_fontHandle);
+  })
+  .catch(() => continueRender(_fontHandle));
 
 export type ReelProps = {
   artworkSrc: string;
@@ -12,6 +25,7 @@ export type ReelProps = {
   artworkRadius: number;
   artworkCenterY: number;
   artworkShadow: number;
+  showCaption: boolean;
 };
 
 export const reelDefaultProps: ReelProps = {
@@ -24,6 +38,7 @@ export const reelDefaultProps: ReelProps = {
   artworkRadius: 32,
   artworkCenterY: 0.47,
   artworkShadow: 0.5,
+  showCaption: false,
 };
 
 // Composition canvas
@@ -58,6 +73,7 @@ export const Reel: React.FC<ReelProps> = ({
   artworkRadius,
   artworkCenterY,
   artworkShadow,
+  showCaption,
 }) => {
   const { w: baseW, h: baseH } = fitBox(artworkAspect);
   const boxW = baseW * artworkScale;
@@ -113,7 +129,29 @@ export const Reel: React.FC<ReelProps> = ({
         ) : null}
       </AbsoluteFill>
 
-      {/* Layer 3 (front): brand logo, fixed TOP-RIGHT, ~6% width */}
+      {/* Layer 3: "Art of the day" caption — just above artwork, Cosmos Oracle, subtle */}
+      {showCaption && (
+        <AbsoluteFill style={{ pointerEvents: "none" }}>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: top - 68,
+              textAlign: "center",
+              fontFamily: "'Cosmos Oracle', serif",
+              fontSize: 34,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "rgba(255, 255, 255, 0.55)",
+            }}
+          >
+            Art of the day
+          </div>
+        </AbsoluteFill>
+      )}
+
+      {/* Layer 4 (front): brand logo, fixed TOP-RIGHT, ~6% width */}
       <AbsoluteFill>
         <Img
           src={resolveSrc(brand.logoSrc)}

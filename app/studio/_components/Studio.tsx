@@ -99,6 +99,7 @@ export const Studio: React.FC = () => {
     DEFAULTS.centerY,
   );
   const [artworkShadow, setArtworkShadow] = useState<number>(DEFAULTS.shadow);
+  const [showCaption, setShowCaption] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [canExport, setCanExport] = useState<boolean | null>(null);
@@ -137,16 +138,19 @@ export const Studio: React.FC = () => {
       artworkRadius,
       artworkCenterY,
       artworkShadow,
+      showCaption: template.id === "light-ray" && showCaption,
     }),
     [
       artworkUrl,
       artworkAspect,
       audioTrack,
       template.background,
+      template.id,
       artworkScale,
       artworkRadius,
       artworkCenterY,
       artworkShadow,
+      showCaption,
     ],
   );
 
@@ -409,6 +413,53 @@ export const Studio: React.FC = () => {
               onChange={setArtworkShadow}
             />
           </div>
+
+          {template.id === "light-ray" && (
+            <div className="flex flex-col gap-2">
+              <label
+                className="font-sans text-xs uppercase tracking-wide"
+                style={{ color: BRAND.colors.grey500 }}
+              >
+                Caption
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowCaption((v) => !v)}
+                className="flex items-center justify-between font-sans text-sm"
+                style={{ background: "none", padding: 0 }}
+              >
+                <span style={{ color: BRAND.colors.ink }}>Art of the day</span>
+                {/* Toggle pill */}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    width: 36,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: showCaption
+                      ? BRAND.colors.ink
+                      : BRAND.colors.grey200,
+                    position: "relative",
+                    flexShrink: 0,
+                    transition: "background-color 0.15s",
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 3,
+                      left: showCaption ? 19 : 3,
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      backgroundColor: "#fff",
+                      transition: "left 0.15s",
+                    }}
+                  />
+                </span>
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* CENTER */}
