@@ -2,18 +2,20 @@ import { AbsoluteFill, continueRender, delayRender, Img, staticFile } from "remo
 import { Audio, Video } from "@remotion/media";
 import { BRAND, type Brand } from "../lib/brand";
 
-const _fontHandle = delayRender("Cosmos Oracle font");
-const _face = new FontFace(
-  "Cosmos Oracle",
-  `url(${staticFile("brand/Cosmos-Oracle.woff2")}) format('woff2')`,
-);
-_face
-  .load()
-  .then(() => {
-    document.fonts.add(_face);
-    continueRender(_fontHandle);
-  })
-  .catch(() => continueRender(_fontHandle));
+if (typeof window !== "undefined") {
+  const _fontHandle = delayRender("Cosmos Oracle font");
+  const _face = new FontFace(
+    "Cosmos Oracle",
+    `url(${staticFile("brand/Cosmos-Oracle.woff2")}) format('woff2')`,
+  );
+  _face
+    .load()
+    .then(() => {
+      document.fonts.add(_face);
+      continueRender(_fontHandle);
+    })
+    .catch(() => continueRender(_fontHandle));
+}
 
 export type ReelProps = {
   artworkSrc: string;
