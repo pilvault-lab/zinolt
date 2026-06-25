@@ -67,6 +67,16 @@ export function prepareLocalVideoSW(): void {
   });
 }
 
+/** Ping the SW to reset its idle timer. Chrome kills idle SWs aggressively,
+ *  which would drop the in-memory clip Map and break the Player mid-playback. */
+export function pingLocalVideoSW(): void {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+  const sw = navigator.serviceWorker.controller;
+  if (sw) sw.postMessage({ type: "ping" });
+}
+
 export async function storeLocalVideo(file: File): Promise<string> {
   const sw = await activeWorker();
   const id =
