@@ -4,6 +4,7 @@ export type Template = {
   label: string;
   background: string;
   preview: string;
+  href?: string;
 };
 
 export const TEMPLATES: readonly Template[] = [
@@ -27,6 +28,13 @@ export const TEMPLATES: readonly Template[] = [
     label: "Light Pillar",
     background: "/rays/light-pillar-white-v3.mp4",
     preview: "/rays/light-pillar-white-v3.mp4",
+  },
+  {
+    id: "letterbox",
+    compositionId: "LetterboxReel",
+    label: "Letterbox Card",
+    background: "",
+    preview: "/letterbox-card-empty.png",
   },
 ] as const;
 

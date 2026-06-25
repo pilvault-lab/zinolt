@@ -1,10 +1,10 @@
 export const BRAND = {
   colors: {
-    ink: "#0A0A0A",
-    paper: "#F5F5F5",
-    grey900: "#1F1F1F",
-    grey500: "#7A7A7A",
-    grey200: "#D9D9D9",
+    ink: "rgb(10, 10, 10)",
+    paper: "rgb(245, 245, 245)",
+    grey900: "rgb(31, 31, 31)",
+    grey500: "rgb(122, 122, 122)",
+    grey200: "rgb(217, 217, 217)",
   },
   fonts: {
     display: {

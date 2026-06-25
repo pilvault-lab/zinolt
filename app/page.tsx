@@ -64,18 +64,27 @@ export default function Home() {
                   className="w-full overflow-hidden rounded-lg aspect-[9/16] md:h-full md:w-auto"
                   style={{ backgroundColor: "#000" }}
                 >
-                  <video
-                    src={t.preview}
-                    muted
-                    autoPlay
-                    loop
-                    playsInline
-                    className="block h-full w-full object-cover"
-                  />
+                  {/\.(png|jpe?g|webp|avif)$/i.test(t.preview) ? (
+                    <img
+                      src={t.preview}
+                      alt={t.label}
+                      className="block h-full w-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={t.preview}
+                      muted
+                      autoPlay
+                      loop
+                      playsInline
+                      className="block h-full w-full object-cover"
+                      suppressHydrationWarning
+                    />
+                  )}
                 </div>
               </div>
               <Button asChild className="w-full rounded-full font-sans">
-                <Link href={`/studio?template=${t.id}`}>Add your art →</Link>
+                <Link href={t.href ?? `/studio?template=${t.id}`}>Add your art →</Link>
               </Button>
             </article>
           ))}
