@@ -19,6 +19,13 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        /* Design-system pill variants — Linear-spec, paired with size="pill". */
+        "pill-primary":
+          "bg-ds-primary text-ds-on-primary rounded-ds-full shadow-[var(--ds-shadow-pill-primary)] hover:bg-ds-primary/90",
+        "pill-secondary":
+          "bg-transparent text-ds-on-surface rounded-ds-full shadow-[var(--ds-shadow-pill-secondary)] hover:bg-ds-surface-raised",
+        "pill-link":
+          "bg-transparent text-ds-on-surface underline underline-offset-4 hover:text-ds-on-surface/80",
       },
       size: {
         default:
@@ -32,6 +39,9 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
+        /* Pill size — 44px min-height, 127px min-width per spec. Use with
+           pill-primary / pill-secondary / pill-link variants. */
+        pill: "min-h-[44px] min-w-[127px] gap-2 px-5 py-3.5 text-[15px] leading-6 tracking-[-0.165px] font-medium",
       },
     },
     defaultVariants: {

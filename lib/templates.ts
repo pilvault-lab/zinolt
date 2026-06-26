@@ -36,6 +36,14 @@ export const TEMPLATES: readonly Template[] = [
     background: "",
     preview: "/letterbox-card-empty.png",
   },
+  {
+    id: "lanyard",
+    compositionId: "Lanyard",
+    label: "Lanyard Slides",
+    background: "",
+    preview: "/lanyard/lanyard-preview.svg",
+    href: "/slides",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;

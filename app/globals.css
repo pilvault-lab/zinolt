@@ -2,7 +2,158 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@font-face {
+  font-family: "Tenor Sans";
+  src: url("/brand/TenorSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system v2 — Linear-derived structural tokens layered on top of
+ * zinolt's existing warm-paper palette. Color taxonomy renamed to the
+ * `surface / on-surface / primary` model so component code is portable
+ * across the eventual dark studio chrome (Option C in the plan).
+ */
+:root {
+  /* Spacing scale (px-exact per design doc) */
+  --ds-space-xs: 6px;
+  --ds-space-sm: 14px;
+  --ds-space-md: 24px;
+  --ds-space-lg: 36px;
+  --ds-space-xl: 128px;
+
+  /* Radius scale */
+  --ds-radius-none: 0px;
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 12px;
+  --ds-radius-xl: 20px;
+  --ds-radius-full: 9999px;
+
+  /* Subtle elevation only — never neon, never glassy */
+  --ds-shadow-sm: rgba(0, 0, 0, 0.4) 0px 2px 4px 0px;
+  --ds-shadow-inner: rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset;
+  --ds-shadow-pill-primary:
+    rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+    rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+  --ds-shadow-pill-secondary:
+    rgba(10, 10, 10, 0.04) 0px 0px 0px 1px inset,
+    rgba(10, 10, 10, 0.02) 0px 1px 0px 0px inset,
+    rgba(10, 10, 10, 0.06) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.04) 0px 4px 4px 0px;
+
+  /* Semantic surfaces — mapped to the existing warm palette */
+  --ds-surface: var(--brand-paper);            /* page background */
+  --ds-surface-raised: #FFFFFF;                /* cards / panels */
+  --ds-on-surface: var(--brand-ink);           /* text on surfaces */
+  --ds-on-surface-muted: var(--brand-grey-500);
+  --ds-border-hairline: rgba(10, 10, 10, 0.08);
+  --ds-border-strong: var(--brand-grey-200);
+  --ds-primary: var(--brand-ink);              /* primary action fill */
+  --ds-on-primary: var(--brand-paper);         /* text on primary fill */
+  --ds-accent-soft: rgba(10, 10, 10, 0.05);    /* hover / pressed haze */
+}
+
+@theme inline {
+  /* Design system tokens → Tailwind utilities. Allows `gap-(--ds-space-md)`
+     style usage and Inter as the default UI face. */
+  --spacing-ds-xs: var(--ds-space-xs);
+  --spacing-ds-sm: var(--ds-space-sm);
+  --spacing-ds-md: var(--ds-space-md);
+  --spacing-ds-lg: var(--ds-space-lg);
+  --spacing-ds-xl: var(--ds-space-xl);
+
+  --radius-ds-sm: var(--ds-radius-sm);
+  --radius-ds-md: var(--ds-radius-md);
+  --radius-ds-lg: var(--ds-radius-lg);
+  --radius-ds-xl: var(--ds-radius-xl);
+  --radius-ds-full: var(--ds-radius-full);
+
+  --color-ds-surface: var(--ds-surface);
+  --color-ds-surface-raised: var(--ds-surface-raised);
+  --color-ds-on-surface: var(--ds-on-surface);
+  --color-ds-on-surface-muted: var(--ds-on-surface-muted);
+  --color-ds-border-hairline: var(--ds-border-hairline);
+  --color-ds-border-strong: var(--ds-border-strong);
+  --color-ds-primary: var(--ds-primary);
+  --color-ds-on-primary: var(--ds-on-primary);
+}
+
+/*
+ * Type-role helpers — apply directly via `.type-headline-display`, etc.
+ * Mirror the design doc's exact pixel/letter-spacing values. Inter Variable
+ * is loaded into --font-ui via next/font in app/layout.tsx.
+ */
+.type-headline-display {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 56px;
+  line-height: 61.6px;
+  letter-spacing: -1.232px;
+  font-weight: 510;
+}
+.type-headline-lg {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 40px;
+  line-height: 44px;
+  letter-spacing: -0.88px;
+  font-weight: 510;
+}
+.type-headline-md {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 20px;
+  line-height: 26.6px;
+  letter-spacing: -0.24px;
+  font-weight: 510;
+}
+.type-body-lg {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+.type-body-md {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 24px;
+  letter-spacing: -0.165px;
+  font-weight: 400;
+}
+.type-body-sm {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.type-label-lg {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 510;
+}
+.type-label-md {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 24px;
+  letter-spacing: -0.165px;
+  font-weight: 510;
+}
+.type-label-sm {
+  font-family: var(--font-ui), Inter, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 510;
+}
+
+/* Marketing display still uses Source Serif 4 for editorial flavour. */
+.type-display-serif {
+  font-family: var(--font-display), "Source Serif 4", Georgia, serif;
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -55,7 +206,10 @@
 }
 
 :root {
-  --font-ui: Helvetica, Arial, sans-serif;
+  /* --font-ui is provided by next/font (Inter Variable) via the html
+     className. Helvetica/Arial remain in the fallback chain in case the
+     font fails to load. */
+  --font-ui-fallback: Helvetica, Arial, sans-serif;
   --brand-ink: #0A0A0A;
   --brand-paper: #F5F5F5;
   --brand-grey-900: #1F1F1F;

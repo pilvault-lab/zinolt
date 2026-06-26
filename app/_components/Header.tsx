@@ -5,25 +5,27 @@ import { BRAND } from "@/lib/brand";
 export const Header: React.FC<{ right?: React.ReactNode }> = ({ right }) => {
   return (
     <header
-      className="flex shrink-0 items-center justify-between px-6"
+      className="flex shrink-0 items-center justify-between bg-ds-surface px-(--ds-space-md)"
       style={{
-        backgroundColor: BRAND.colors.paper,
-        borderBottom: `1px solid ${BRAND.colors.grey200}`,
+        borderBottom: `1px solid var(--ds-border-hairline)`,
         height: 64,
       }}
     >
-      <Link href="/" className="flex items-center gap-2 no-underline">
+      <Link
+        href="/"
+        className="flex items-center gap-(--ds-space-xs) no-underline"
+      >
         <Image
           src={BRAND.iconSrc}
           alt=""
           aria-hidden
-          width={28}
-          height={28}
+          width={26}
+          height={26}
           priority
           style={{ borderRadius: 6, display: "block" }}
         />
         <span
-          className="font-display text-2xl tracking-tight"
+          className="type-label-lg tracking-tight"
           style={{ color: BRAND.colors.ink }}
         >
           zinolt
