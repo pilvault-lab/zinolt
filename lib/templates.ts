@@ -7,7 +7,10 @@ export type Template = {
   href?: string;
 };
 
-export const TEMPLATES: readonly Template[] = [
+/* Archived — kept in source so the routes / Remotion compositions still
+ * work directly, but hidden from the homepage grid. Restore by moving an
+ * entry back into TEMPLATES. */
+export const ARCHIVED_TEMPLATES: readonly Template[] = [
   {
     id: "light-ray",
     compositionId: "LightRay",
@@ -30,19 +33,22 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/rays/light-pillar-white-v3.mp4",
   },
   {
-    id: "letterbox",
-    compositionId: "LetterboxReel",
-    label: "Letterbox Card",
-    background: "",
-    preview: "/letterbox-card-empty.png",
-  },
-  {
     id: "lanyard",
     compositionId: "Lanyard",
     label: "Lanyard Slides",
     background: "",
     preview: "/lanyard/lanyard-preview.svg",
     href: "/slides",
+  },
+] as const;
+
+export const TEMPLATES: readonly Template[] = [
+  {
+    id: "letterbox",
+    compositionId: "LetterboxReel",
+    label: "Letterbox Card",
+    background: "",
+    preview: "/letterbox-card-empty.png",
   },
   {
     id: "wall",
@@ -60,9 +66,19 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/frosted/frosted-preview.svg",
     href: "/frosted",
   },
+  {
+    id: "dangle",
+    compositionId: "Dangle",
+    label: "Dangle Card",
+    background: "",
+    preview: "/dangle/dangle-preview.svg",
+    href: "/dangle",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
 
-export const getTemplate = (id: string | null | undefined): Template =>
-  TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0];
+export const getTemplate = (id: string | null | undefined): Template => {
+  const all = [...TEMPLATES, ...ARCHIVED_TEMPLATES];
+  return all.find((t) => t.id === id) ?? TEMPLATES[0];
+};

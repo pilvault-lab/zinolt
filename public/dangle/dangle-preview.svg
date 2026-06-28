@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#3a3a3f" />
+      <stop offset="55%" stop-color="#18181b" />
+      <stop offset="100%" stop-color="#070708" />
+    </radialGradient>
+  </defs>
+
+  <rect width="270" height="480" fill="url(#bg)" />
+
+  <!-- band swinging slightly to the right -->
+  <path d="M135 0 Q140 60 150 130 Q158 200 170 270"
+        stroke="#FAFAFA" stroke-width="6" fill="none" stroke-linecap="round" />
+  <!-- band texture suggestion -->
+  <path d="M135 0 Q140 60 150 130 Q158 200 170 270"
+        stroke="rgba(0,0,0,0.18)" stroke-width="2" fill="none" stroke-dasharray="6 8" />
+
+  <!-- clip + clamp -->
+  <rect x="158" y="260" width="24" height="14" rx="3" fill="#a8a8ab" />
+  <rect x="162" y="263" width="16" height="8" rx="2" fill="#7a7a7d" />
+
+  <!-- card hanging at a slight angle -->
+  <g transform="translate(170 282) rotate(8)">
+    <rect x="-60" y="0" width="120" height="160" rx="10"
+          fill="#FAFAFA" stroke="rgba(0,0,0,0.06)" />
+    <text x="0" y="60" text-anchor="middle"
+          font-family="Inter, Arial, sans-serif"
+          font-size="12" letter-spacing="3"
+          fill="rgba(10,10,10,0.5)">DRAG</text>
+    <text x="0" y="92" text-anchor="middle"
+          font-family="Inter, Arial, sans-serif"
+          font-size="22" font-weight="700"
+          fill="#0A0A0A">SWING</text>
+    <text x="0" y="130" text-anchor="middle"
+          font-family="Inter, Arial, sans-serif"
+          font-size="9" letter-spacing="2"
+          fill="rgba(10,10,10,0.4)">PHYSICS · RAPIER</text>
+  </g>
+
+  <text x="20" y="455" font-family="Inter, Arial, sans-serif"
+        font-size="7" letter-spacing="3"
+        fill="rgba(255,255,255,0.45)">ZINOLT · DANGLE</text>
+</svg>
