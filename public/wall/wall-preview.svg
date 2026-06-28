@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" preserveAspectRatio="xMidYMid slice">
+  <!-- Matte light-grey wall -->
+  <rect width="270" height="480" fill="#E5E5E5" />
+  <!-- Angled text — approximated via a transform group to suggest the perspective tilt -->
+  <g transform="translate(28 220) rotate(-3) skewX(8)">
+    <text x="0" y="-40" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="44"
+          letter-spacing="-2" fill="#121212">WALL</text>
+    <text x="0" y="6" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="44"
+          letter-spacing="-2" fill="#121212">SIGN-</text>
+    <text x="0" y="52" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="44"
+          letter-spacing="-2" fill="#121212">AGE</text>
+  </g>
+  <!-- Tiny corner mark -->
+  <text x="20" y="450" font-family="Inter, Arial, sans-serif" font-size="7" letter-spacing="3" fill="rgba(18,18,18,0.45)">ZINOLT · WALL</text>
+</svg>

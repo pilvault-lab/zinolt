@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4d6b8c" />
+      <stop offset="100%" stop-color="#2c3f55" />
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" />
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="270" height="480" fill="url(#bg)" />
+  <!-- Soft glows behind card -->
+  <circle cx="80" cy="120" r="55" fill="rgba(255,255,255,0.18)" filter="url(#soft)" />
+  <circle cx="220" cy="360" r="65" fill="rgba(255,255,255,0.12)" filter="url(#soft)" />
+
+  <!-- Frosted card -->
+  <rect x="32" y="140" width="206" height="200" rx="28"
+        fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.35)" stroke-width="1" />
+
+  <!-- Icon row -->
+  <g transform="translate(50 168)">
+    <circle cx="14" cy="14" r="12" fill="rgba(255,255,255,0.85)" />
+    <circle cx="46" cy="14" r="12" fill="rgba(255,255,255,0.12)" />
+    <circle cx="78" cy="14" r="12" fill="rgba(255,255,255,0.12)" />
+    <circle cx="110" cy="14" r="12" fill="rgba(255,255,255,0.12)" />
+  </g>
+
+  <!-- Mode + headline -->
+  <text x="50" y="220" font-family="Inter, sans-serif" font-size="8" letter-spacing="1" fill="rgba(255,255,255,0.55)">MODE</text>
+  <text x="50" y="246" font-family="Inter, sans-serif" font-size="22" fill="#FFFFFF" letter-spacing="-0.5">Do not disturb</text>
+
+  <!-- Divider -->
+  <line x1="50" y1="260" x2="220" y2="260" stroke="rgba(255,255,255,0.18)" stroke-width="1" />
+
+  <!-- Options -->
+  <text x="50" y="280" font-family="Inter, sans-serif" font-size="10" fill="rgba(255,255,255,0.75)">Quiet</text>
+  <text x="50" y="298" font-family="Inter, sans-serif" font-size="10" fill="rgba(255,255,255,0.75)">Focus</text>
+  <!-- Active option pill -->
+  <rect x="46" y="306" width="178" height="22" rx="11" fill="rgba(255,255,255,0.22)" />
+  <text x="56" y="321" font-family="Inter, sans-serif" font-size="10" fill="#FFFFFF">Sleep</text>
+  <path d="M210 314 l4 4 l8 -8" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Corner mark -->
+  <text x="20" y="450" font-family="Inter, sans-serif" font-size="7" letter-spacing="3" fill="rgba(255,255,255,0.45)">ZINOLT · FROSTED</text>
+</svg>

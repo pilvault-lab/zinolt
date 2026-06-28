@@ -44,6 +44,22 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/lanyard/lanyard-preview.svg",
     href: "/slides",
   },
+  {
+    id: "wall",
+    compositionId: "WallSignage",
+    label: "Wall Signage",
+    background: "",
+    preview: "/wall/wall-preview.svg",
+    href: "/wall",
+  },
+  {
+    id: "frosted",
+    compositionId: "FrostedCard",
+    label: "Frosted Card",
+    background: "",
+    preview: "/frosted/frosted-preview.svg",
+    href: "/frosted",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
