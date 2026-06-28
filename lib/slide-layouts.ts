@@ -15,8 +15,18 @@ export type Field = {
 
 export type SlideValues = Record<string, string>;
 
+/** Per-slide typography overrides exposed via the studio's font controls. */
+export type SlideTypography = {
+  fontSize?: number;
+  fontWeight?: number;
+  lineHeight?: number;
+  /** Letter spacing in em (e.g. 0, -0.02, 0.05). */
+  letterSpacing?: number;
+};
+
 export type LayoutRenderProps<V extends SlideValues = SlideValues> = {
   values: V;
+  typography?: SlideTypography;
 };
 
 export type SlideLayout = {

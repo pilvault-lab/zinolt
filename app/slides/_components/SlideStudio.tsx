@@ -9,6 +9,7 @@ import {
   DEFAULT_LAYOUT_ID,
   getLayout,
   type Field,
+  type SlideTypography,
   type SlideValues,
 } from "@/lib/slide-layouts";
 import {
@@ -31,6 +32,11 @@ type Slide = {
   values: SlideValues;
   backgroundTone: BackgroundTone;
   cardTone: CardTone;
+  /** Hex (#RRGGBB) override for the card body. When set, supersedes the
+   *  preset tone's cardColor. Ink (text) color is auto-derived from this. */
+  customCardColor?: string;
+  /** Per-slide typography overrides for the layout. */
+  typography?: SlideTypography;
 };
 
 type CardTone = "paper" | "bone" | "ink";
@@ -42,6 +48,25 @@ const CARD_TONES: Record<
   paper: { label: "Paper", cardColor: "#FAFAFA", cardInk: "#0A0A0A", strap: "#0A0A0A" },
   bone: { label: "Bone", cardColor: "#F3F1EC", cardInk: "#1A1715", strap: "#1A1612" },
   ink: { label: "Ink", cardColor: "#101013", cardInk: "#F2F2F2", strap: "#0A0A0A" },
+};
+
+/**
+ * YIQ perceived-brightness contrast picker. Light cards → near-black ink,
+ * dark cards → near-white ink. Threshold of 140 keeps mid-tone surfaces
+ * (e.g. mustard, terracotta) reading as dark text since text legibility
+ * skews stricter than pure 50% luminance.
+ */
+const INK_DARK = "#0A0A0A";
+const INK_LIGHT = "#F2F2F2";
+const readableInkFor = (hex: string): string => {
+  const h = hex.replace("#", "").trim();
+  if (h.length !== 6) return INK_DARK;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return INK_DARK;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 140 ? INK_DARK : INK_LIGHT;
 };
 
 const TONE_LABELS: Record<BackgroundTone, string> = {
@@ -174,6 +199,13 @@ export const SlideStudio: React.FC = () => {
   const layout = getLayout(activeSlide.layoutId);
   const values = activeSlide.values;
   const cardTone = CARD_TONES[activeSlide.cardTone];
+  // Effective surface colour: picker override beats the tone preset. Ink
+  // colour adapts to it automatically so the typography always contrasts.
+  const effectiveCardColor =
+    activeSlide.customCardColor && /^#[0-9a-fA-F]{6}$/.test(activeSlide.customCardColor)
+      ? activeSlide.customCardColor
+      : cardTone.cardColor;
+  const effectiveCardInk = readableInkFor(effectiveCardColor);
 
   const updateSlide = useCallback(
     (id: string, mut: (s: Slide) => Slide) => {
@@ -206,6 +238,19 @@ export const SlideStudio: React.FC = () => {
   const setCardTone = useCallback(
     (t: CardTone) =>
       updateActive((s) => ({ ...s, cardTone: t })),
+    [updateActive],
+  );
+  const setCustomCardColor = useCallback(
+    (color: string | undefined) =>
+      updateActive((s) => ({ ...s, customCardColor: color })),
+    [updateActive],
+  );
+  const setTypography = useCallback(
+    (patch: Partial<SlideTypography>) =>
+      updateActive((s) => ({
+        ...s,
+        typography: { ...(s.typography ?? {}), ...patch },
+      })),
     [updateActive],
   );
 
@@ -301,6 +346,9 @@ export const SlideStudio: React.FC = () => {
     setExportError("");
     setIsExporting(true);
     try {
+      // Flush BadgeShell's 80ms texture-rebake debounce so we never export
+      // a stale card face when the user types and immediately hits download.
+      await new Promise((r) => window.setTimeout(r, 140));
       const dataUrl = await api.exportPng();
       const a = document.createElement("a");
       a.href = dataUrl;
@@ -542,6 +590,140 @@ export const SlideStudio: React.FC = () => {
                 })}
               </div>
             </div>
+
+            {/* Custom color picker — overrides the active card tone. Ink
+                colour adapts automatically (light card → black text, dark
+                card → white text) via YIQ luminance. */}
+            <div className="flex flex-col gap-1.5">
+              <span
+                className="font-sans text-[11px]"
+                style={{ color: BRAND.colors.grey500 }}
+              >
+                Custom color
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={effectiveCardColor}
+                  onChange={(e) => setCustomCardColor(e.target.value)}
+                  aria-label="Card color"
+                  style={{
+                    width: 44,
+                    height: 32,
+                    padding: 0,
+                    border: `1px solid ${BRAND.colors.grey200}`,
+                    borderRadius: 6,
+                    backgroundColor: "transparent",
+                    cursor: "pointer",
+                  }}
+                />
+                <code
+                  className="font-sans"
+                  style={{
+                    fontSize: 11,
+                    color: BRAND.colors.ink,
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    letterSpacing: 0,
+                  }}
+                >
+                  {effectiveCardColor.toUpperCase()}
+                </code>
+                {activeSlide.customCardColor ? (
+                  <button
+                    type="button"
+                    onClick={() => setCustomCardColor(undefined)}
+                    aria-label="Reset to tone preset"
+                    title="Reset to tone preset"
+                    className="ml-auto font-sans"
+                    style={{
+                      fontSize: 11,
+                      color: BRAND.colors.grey500,
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      textUnderlineOffset: 2,
+                    }}
+                  >
+                    Reset
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* Typography controls — overrides the active layout's defaults
+              per slide. Stored on `slide.typography` so each slide can have
+              its own settings. */}
+          <div
+            className="flex flex-col gap-3"
+            style={{
+              borderTop: `1px solid ${BRAND.colors.grey200}`,
+              paddingTop: 24,
+            }}
+          >
+            <label
+              className="type-label-sm uppercase tracking-wide text-ds-on-surface-muted text-[11px]"
+            >
+              Typography
+            </label>
+            <TypographyControl
+              label="Size"
+              value={activeSlide.typography?.fontSize ?? 130}
+              min={60}
+              max={220}
+              step={2}
+              suffix="px"
+              onChange={(v) => setTypography({ fontSize: v })}
+            />
+            <TypographyControl
+              label="Weight"
+              value={activeSlide.typography?.fontWeight ?? 400}
+              min={300}
+              max={900}
+              step={100}
+              onChange={(v) => setTypography({ fontWeight: v })}
+            />
+            <TypographyControl
+              label="Line height"
+              value={activeSlide.typography?.lineHeight ?? 1.4}
+              min={1}
+              max={2}
+              step={0.05}
+              onChange={(v) => setTypography({ lineHeight: v })}
+            />
+            <TypographyControl
+              label="Tracking"
+              value={activeSlide.typography?.letterSpacing ?? 0}
+              min={-0.05}
+              max={0.1}
+              step={0.005}
+              suffix="em"
+              onChange={(v) => setTypography({ letterSpacing: v })}
+            />
+            <button
+              type="button"
+              onClick={() => setTypography({
+                fontSize: undefined,
+                fontWeight: undefined,
+                lineHeight: undefined,
+                letterSpacing: undefined,
+              })}
+              className="self-start font-sans"
+              style={{
+                fontSize: 11,
+                color: BRAND.colors.grey500,
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+              }}
+            >
+              Reset typography
+            </button>
           </div>
 
           <div
@@ -589,12 +771,15 @@ export const SlideStudio: React.FC = () => {
             <BadgeShell
               ref={badgeRef}
               backgroundTone={activeSlide.backgroundTone}
-              cardColor={cardTone.cardColor}
-              cardInkColor={cardTone.cardInk}
+              cardColor={effectiveCardColor}
+              cardInkColor={effectiveCardInk}
               strapColor={cardTone.strap}
               orientation={orientation}
             >
-              <LayoutRender values={values} />
+              <LayoutRender
+                values={values}
+                typography={activeSlide.typography}
+              />
             </BadgeShell>
           </div>
         </main>
@@ -733,6 +918,54 @@ export const SlideStudio: React.FC = () => {
           </div>
         </aside>
       </div>
+    </div>
+  );
+};
+
+const TypographyControl: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix?: string;
+  onChange: (v: number) => void;
+}> = ({ label, value, min, max, step, suffix, onChange }) => {
+  const decimals = step < 0.01 ? 3 : step < 1 ? 2 : 0;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <span
+          className="font-sans"
+          style={{ fontSize: 11, color: BRAND.colors.grey500 }}
+        >
+          {label}
+        </span>
+        <code
+          className="font-sans"
+          style={{
+            fontSize: 11,
+            color: BRAND.colors.ink,
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            letterSpacing: 0,
+          }}
+        >
+          {value.toFixed(decimals)}
+          {suffix ?? ""}
+        </code>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full"
+        style={{
+          accentColor: BRAND.colors.ink,
+        }}
+      />
     </div>
   );
 };

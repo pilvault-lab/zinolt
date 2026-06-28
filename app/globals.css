@@ -3,9 +3,18 @@
 @import "shadcn/tailwind.css";
 
 @font-face {
-  font-family: "Tenor Sans";
-  src: url("/brand/TenorSans-Regular.woff2") format("woff2");
+  font-family: "Cosmos Oracle";
+  src: url("/brand/Cosmos-Oracle.woff2") format("woff2");
   font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "AngelList";
+  src: url("/brand/AngelList_VF-s.p.0ojal8_uqld7i.woff2") format("woff2-variations"),
+    url("/brand/AngelList_VF-s.p.0ojal8_uqld7i.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }

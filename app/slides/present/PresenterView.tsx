@@ -12,6 +12,7 @@ import {
 import {
   DEFAULT_LAYOUT_ID,
   getLayout,
+  type SlideTypography,
   type SlideValues,
 } from "@/lib/slide-layouts";
 
@@ -29,12 +30,27 @@ const CARD_TONES: Record<
   ink: { cardColor: "#101013", cardInk: "#F2F2F2", strap: "#0A0A0A" },
 };
 
+const INK_DARK = "#0A0A0A";
+const INK_LIGHT = "#F2F2F2";
+const readableInkFor = (hex: string): string => {
+  const h = hex.replace("#", "").trim();
+  if (h.length !== 6) return INK_DARK;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return INK_DARK;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 140 ? INK_DARK : INK_LIGHT;
+};
+
 type PresenterSlide = {
   id: string;
   layoutId: string;
   values: SlideValues;
   backgroundTone: BackgroundTone;
   cardTone: CardTone;
+  customCardColor?: string;
+  typography?: SlideTypography;
 };
 
 const loadSlides = (): PresenterSlide[] => {
@@ -53,6 +69,8 @@ const loadSlides = (): PresenterSlide[] => {
         s.cardTone && s.cardTone in CARD_TONES
           ? (s.cardTone as CardTone)
           : "paper",
+      customCardColor: s.customCardColor,
+      typography: s.typography,
     }));
   } catch {
     return [];
@@ -145,6 +163,11 @@ export const PresenterView: React.FC = () => {
   const LayoutRender = layout.Render;
   const dims = ORIENTATIONS[orientation];
   const aspect = dims.height / dims.width;
+  const effectiveCardColor =
+    active.customCardColor && /^#[0-9a-fA-F]{6}$/.test(active.customCardColor)
+      ? active.customCardColor
+      : cardTone.cardColor;
+  const effectiveCardInk = readableInkFor(effectiveCardColor);
 
   return (
     <div
@@ -180,12 +203,15 @@ export const PresenterView: React.FC = () => {
       >
         <BadgeShell
           backgroundTone={active.backgroundTone}
-          cardColor={cardTone.cardColor}
-          cardInkColor={cardTone.cardInk}
+          cardColor={effectiveCardColor}
+          cardInkColor={effectiveCardInk}
           strapColor={cardTone.strap}
           orientation={orientation}
         >
-          <LayoutRender values={active.values} />
+          <LayoutRender
+            values={active.values}
+            typography={active.typography}
+          />
         </BadgeShell>
       </div>
 

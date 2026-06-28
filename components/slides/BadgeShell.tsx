@@ -12,14 +12,8 @@ import {
   type ReactNode,
 } from "react";
 
-const STRAP_LOGO = "/brand/zinolt-logo-white.png";
 import { Canvas, useThree } from "@react-three/fiber";
-import {
-  ContactShadows,
-  Environment,
-  Lightformer,
-  useGLTF,
-} from "@react-three/drei";
+import { Environment, Lightformer, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { toCanvas } from "html-to-image";
 
@@ -73,10 +67,15 @@ export const CARD_CONTENT = {
 // below centre, and run the band up to BAND_TOP_Y near the top of the frame.
 const TARGET_CARD_H = 6.4;
 const CARD_CENTER_Y = -0.5;
+// Push the whole card forward in world Z so it sits visibly proud of the
+// backdrop + shadow plane — reads as a real lanyard hanging *off* the wall
+// rather than printed flush against it. The band's bottom anchor is derived
+// from the card's transform, so it travels with the card automatically.
+const CARD_Z_OFFSET = 0.65;
 // Push the ribbon top above the visible frame so the strap reads as
 // running off-screen (visible half-height ≈ 5.3 at z≈0, fov=20 from z=30).
-const BAND_TOP_Y = 5.3;
-const BAND_WIDTH = 0.8;
+const BAND_TOP_Y = 5.22;
+const BAND_WIDTH = 0.7;
 // Layout texture sits just inside the card's rounded white edge.
 const FRONT_INSET = 0.93;
 
@@ -187,35 +186,11 @@ export const BadgeShell = forwardRef<BadgeShellHandle, Props>(
               height: CARD_PX_H,
               backgroundColor: cardColor,
               overflow: "hidden",
-              fontFamily: "'Tenor Sans', Helvetica, Arial, sans-serif",
+              fontFamily:
+                "'AngelList', system-ui, -apple-system, sans-serif",
               color: cardInkColor,
-              boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.04)",
             }}
           >
-            {/* Paper highlight to mirror the original CSS shell. */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background:
-                  "radial-gradient(ellipse 70% 55% at 50% 35%, rgba(255,255,255,0.55) 0%, transparent 70%)",
-                pointerEvents: "none",
-              }}
-            />
-            {/* Clip shadow — soft dark band falling onto the top of the card
-                from the metal clip hardware. */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 220,
-                background:
-                  "linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.06) 35%, transparent 100%)",
-                pointerEvents: "none",
-              }}
-            />
             <div
               style={{
                 position: "absolute",
@@ -236,41 +211,6 @@ export const BadgeShell = forwardRef<BadgeShellHandle, Props>(
               }}
             >
               {children}
-            </div>
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: 40,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: 10,
-                fontFamily: "'Tenor Sans', Helvetica, Arial, sans-serif",
-                fontSize: 11,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "rgba(26,26,26,0.6)",
-              }}
-            >
-              <span
-                style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(26,26,26,0.6)",
-                }}
-              />
-              zinolt
-              <span
-                style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(26,26,26,0.6)",
-                }}
-              />
             </div>
           </div>
         </div>
@@ -303,7 +243,6 @@ export const BadgeShell = forwardRef<BadgeShellHandle, Props>(
             cardTexture={cardTexture}
             backgroundTone={backgroundTone}
             cardColor={cardColor}
-            strapColor={strapColor}
           />
         </Canvas>
       </>
@@ -372,8 +311,7 @@ const Scene: React.FC<{
   cardTexture: THREE.CanvasTexture | null;
   backgroundTone: BackgroundTone;
   cardColor: string;
-  strapColor: string;
-}> = ({ cardTexture, backgroundTone, cardColor, strapColor }) => {
+}> = ({ cardTexture, backgroundTone, cardColor }) => {
   // Generate a radial-gradient backdrop texture per tone.
   const backdropTexture = useMemo(() => {
     const c = document.createElement("canvas");
@@ -458,22 +396,8 @@ const Scene: React.FC<{
           toneMapped={false}
         />
       </mesh>
-      {/* drei's ContactShadows projects a soft silhouette pool below the
-          badge — barely visible from straight-on but adds depth at the
-          card's base when viewed slightly off-axis. */}
-      <ContactShadows
-        position={[0, CARD_CENTER_Y - 3.5, -0.5]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        opacity={0.35}
-        scale={8}
-        blur={2.8}
-        far={2}
-        resolution={512}
-        color="#000000"
-      />
-
       <Suspense fallback={null}>
-        <LanyardRig cardTexture={cardTexture} strapColor={strapColor} />
+        <LanyardRig cardTexture={cardTexture} cardColor={cardColor} />
       </Suspense>
 
       <Environment blur={0.75}>
@@ -514,8 +438,8 @@ const Scene: React.FC<{
 // lanyard frozen in a resting pose so it composes (and exports) deterministically.
 const LanyardRig: React.FC<{
   cardTexture: THREE.CanvasTexture | null;
-  strapColor: string;
-}> = ({ cardTexture, strapColor }) => {
+  cardColor: string;
+}> = ({ cardTexture, cardColor }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { nodes, materials } = useGLTF(CARD_GLB) as any;
 
@@ -537,7 +461,10 @@ const LanyardRig: React.FC<{
     const pos = new THREE.Vector3(
       -s * center.x,
       CARD_CENTER_Y - s * center.y,
-      -s * center.z,
+      // Card sits well in front of the backdrop. Band, clip, and front
+      // overlay plane all derive from this transform, so they travel
+      // together to the new depth.
+      -s * center.z + CARD_Z_OFFSET,
     );
 
     const frontPlane = {
@@ -575,28 +502,25 @@ const LanyardRig: React.FC<{
     };
   }, [nodes]);
 
-  // Imperatively assign the layout map (avoids a reconciliation race with the
-  // CanvasTexture upload and lets us fall back to plain white before content).
-  const frontMatRef = useRef<THREE.MeshStandardMaterial>(null);
+  // Imperatively sync map + color on the front face material — the
+  // declarative `<meshBasicMaterial map={cardTexture}/>` pattern can leave
+  // a stale `.map` when both texture and colour change in the same render.
+  const frontMatRef = useRef<THREE.MeshBasicMaterial>(null);
   useEffect(() => {
     const mat = frontMatRef.current;
     if (!mat) return;
     mat.map = cardTexture;
-    mat.color.set(cardTexture ? "#ffffff" : "#FAFAFA");
+    mat.color.set(cardTexture ? "#ffffff" : cardColor);
     mat.needsUpdate = true;
-  }, [cardTexture]);
+  }, [cardTexture, cardColor]);
 
   return (
     <>
       <group position={groupPos} scale={scale}>
+        {/* Flat colored card body — basic material, no clearcoat, no
+            environment glow. Just the chosen card color. */}
         <mesh geometry={nodes.card.geometry}>
-          <meshPhysicalMaterial
-            color="#ffffff"
-            clearcoat={1}
-            clearcoatRoughness={0.18}
-            roughness={0.85}
-            metalness={0.1}
-          />
+          <meshBasicMaterial color={cardColor} toneMapped={false} />
         </mesh>
         <mesh
           geometry={nodes.clip.geometry}
@@ -605,92 +529,45 @@ const LanyardRig: React.FC<{
         />
         <mesh geometry={nodes.clamp.geometry} material={materials.metal} />
 
-        {/* Layout content, overlaid on the card face */}
+        {/* Layout content overlaid on the card face. */}
         <mesh position={front.pos}>
           <planeGeometry args={[front.w, front.h]} />
-          <meshStandardMaterial
-            ref={frontMatRef}
-            color="#FAFAFA"
-            roughness={0.92}
-            metalness={0}
-          />
+          <meshBasicMaterial ref={frontMatRef} toneMapped={false} />
         </mesh>
       </group>
 
+      {/* Strap inherits the same material as the hook hardware so it reads
+          as a continuous metallic ribbon. */}
       <StaticBand
         bottom={bandBottom}
         top={bandTop}
         width={BAND_WIDTH}
-        color={strapColor}
+        material={materials.metal}
       />
     </>
   );
 };
 
-// Flat vertical ribbon: a solid-color plane plus a transparent logo plane
-// floating just in front of it. Two planes keeps each material clean — no
-// canvas compositing, no race between fillRect and drawImage, just a coloured
-// ribbon with the white zinolt mark layered on top.
+// Flat vertical ribbon using the same metal material as the hook + clamp,
+// so the strap/clip read as one continuous hardware piece.
 const StaticBand: React.FC<{
   bottom: THREE.Vector3;
   top: THREE.Vector3;
   width: number;
-  color: string;
-}> = ({ bottom, top, width, color }) => {
+  material: THREE.Material;
+}> = ({ bottom, top, width, material }) => {
   const height = top.y - bottom.y;
   const centerY = (top.y + bottom.y) / 2;
 
-  const [logoTex, setLogoTex] = useState<THREE.Texture | null>(null);
-  const [logoAspect, setLogoAspect] = useState(4);
-
-  useEffect(() => {
-    const loader = new THREE.TextureLoader();
-    loader.load(STRAP_LOGO, (tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 16;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      const img = tex.image as HTMLImageElement;
-      if (img?.width && img?.height) {
-        setLogoAspect(img.width / img.height);
-      }
-      setLogoTex(tex);
-    });
-    return () => {
-      setLogoTex((prev) => {
-        prev?.dispose();
-        return null;
-      });
-    };
-  }, []);
-
-  const logoW = width * 0.62;
-  const logoH = logoW / logoAspect;
-
   return (
-    <group>
-      {/* Solid fabric base */}
-      <mesh position={[bottom.x, centerY, bottom.z]}>
-        <planeGeometry args={[width, height]} />
-        <meshBasicMaterial
-          color={color}
-          toneMapped={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {/* White zinolt logo overlay — slightly in front to avoid z-fighting */}
-      {logoTex ? (
-        <mesh position={[bottom.x, centerY, bottom.z + 0.01]}>
-          <planeGeometry args={[logoW, logoH]} />
-          <meshBasicMaterial
-            map={logoTex}
-            transparent
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      ) : null}
-    </group>
+    <mesh position={[bottom.x, centerY, bottom.z]}>
+      <planeGeometry args={[width, height]} />
+      <primitive
+        object={material}
+        attach="material"
+        side={THREE.DoubleSide}
+      />
+    </mesh>
   );
 };
 
