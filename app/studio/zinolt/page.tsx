@@ -64,7 +64,7 @@ function BgSwatch({
     <button
       type="button"
       onClick={onClick}
-      className="flex-1 rounded py-2 font-sans text-xs transition-all"
+      className="flex-1 rounded py-3 md:py-2 font-sans text-xs transition-all"
       style={{
         backgroundColor: bg,
         color: fg,
@@ -103,14 +103,16 @@ export default function LetterboxCardPage() {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
-  // Container resize → CSS scale
+  // Container resize → CSS scale. Padding adapts to viewport — narrow
+  // phone screens can't spare 56px on each side and still show a usable
+  // preview.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        const pad = 56;
+        const pad = width < 480 ? 12 : 56;
         const s = Math.min(
           (width - pad * 2) / STAGE_W,
           (height - pad * 2) / STAGE_H,
@@ -322,6 +324,7 @@ export default function LetterboxCardPage() {
         <Field label="Start at (s)">
           <input
             type="number"
+            inputMode="decimal"
             min={0}
             step={0.1}
             value={startOffset}
@@ -356,13 +359,15 @@ export default function LetterboxCardPage() {
           </div>
         </Field>
 
-        {/* Spacer + record button + debug info pinned to bottom */}
-        <div className="mt-auto flex flex-col gap-4">
+        {/* Record button + debug info. Pinned to the bottom of the column
+            on desktop; flows inline below the controls on mobile so it
+            isn't pushed off-screen by mt-auto. */}
+        <div className="flex flex-col gap-4 md:mt-auto">
           <button
             type="button"
             onClick={handleRecord}
             disabled={!videoUrl || isRecording}
-            className="w-full rounded px-4 py-2.5 font-sans text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded px-4 py-3 md:py-2.5 font-sans text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             style={{
               backgroundColor: "#FFFFFF",
               color: "#000000",
@@ -386,7 +391,7 @@ export default function LetterboxCardPage() {
       {/* ── Stage area ── */}
       <main
         ref={containerRef}
-        className="flex flex-1 items-center justify-center overflow-hidden order-1 md:order-2 min-h-[45vh] md:min-h-0"
+        className="flex flex-1 items-center justify-center overflow-hidden order-1 md:order-2 min-h-[55vh] md:min-h-0"
       >
         {/*
           Outer wrapper sized to the visual (scaled) dimensions so flex
