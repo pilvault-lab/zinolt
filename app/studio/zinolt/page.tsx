@@ -254,15 +254,16 @@ export default function LetterboxCardPage() {
   }, [videoUrl, startOffset]);
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: "#181818" }}>
+    <div
+      className="flex min-h-screen flex-col md:flex-row"
+      style={{ backgroundColor: "#181818" }}
+    >
       {/* ── Sidebar ── */}
       <aside
-        className="flex shrink-0 flex-col gap-5 overflow-y-auto"
+        className="flex shrink-0 flex-col gap-5 overflow-y-auto p-4 md:p-6 order-2 md:order-1 w-full md:w-[280px] border-t md:border-t-0 md:border-r"
         style={{
-          width: 280,
-          padding: 24,
           backgroundColor: "#0F0F0F",
-          borderRight: "1px solid rgba(255,255,255,0.07)",
+          borderColor: "rgba(255,255,255,0.07)",
         }}
       >
         <p
@@ -385,7 +386,7 @@ export default function LetterboxCardPage() {
       {/* ── Stage area ── */}
       <main
         ref={containerRef}
-        className="flex flex-1 items-center justify-center overflow-hidden"
+        className="flex flex-1 items-center justify-center overflow-hidden order-1 md:order-2 min-h-[45vh] md:min-h-0"
       >
         {/*
           Outer wrapper sized to the visual (scaled) dimensions so flex

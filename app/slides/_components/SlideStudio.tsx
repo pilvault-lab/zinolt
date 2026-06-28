@@ -462,14 +462,13 @@ export const SlideStudio: React.FC = () => {
         }
       />
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
         {/* LEFT — layout picker + tones + form */}
         <aside
-          className="flex flex-col gap-6 overflow-y-auto p-6"
+          className="flex flex-col gap-6 overflow-y-auto p-4 md:p-6 order-2 md:order-1 w-full md:w-[320px] flex-shrink-0 border-b md:border-b-0 md:border-r"
           style={{
-            width: 320,
             backgroundColor: BRAND.colors.paper,
-            borderRight: `1px solid ${BRAND.colors.grey200}`,
+            borderColor: BRAND.colors.grey200,
           }}
         >
           <div className="flex flex-col gap-2">
@@ -753,13 +752,14 @@ export const SlideStudio: React.FC = () => {
 
         {/* CENTER — preview */}
         <main
-          className="flex flex-1 items-center justify-center"
-          style={{ backgroundColor: "#5A5A60", padding: 48 }}
+          className="flex flex-1 items-center justify-center order-1 md:order-2 min-h-[40vh] md:min-h-0"
+          style={{ backgroundColor: "#5A5A60", padding: 20 }}
         >
           <div
             style={{
-              width: previewWidth,
-              height: previewHeight,
+              width: `min(${previewWidth}px, calc(100vw - 56px))`,
+              aspectRatio: `${dims.width} / ${dims.height}`,
+              maxHeight: "calc(100vh - 200px)",
               position: "relative",
               flexShrink: 0,
               // Three-layer ambient depth — sharp structural grounding +
@@ -786,11 +786,10 @@ export const SlideStudio: React.FC = () => {
 
         {/* RIGHT — export + slide picker */}
         <aside
-          className="flex flex-col"
+          className="flex flex-col order-3 w-full md:w-[280px] flex-shrink-0 border-t md:border-t-0 md:border-l"
           style={{
-            width: 280,
             backgroundColor: BRAND.colors.paper,
-            borderLeft: `1px solid ${BRAND.colors.grey200}`,
+            borderColor: BRAND.colors.grey200,
             minHeight: 0,
           }}
         >
