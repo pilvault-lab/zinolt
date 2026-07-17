@@ -38,7 +38,11 @@ import {
   stackedDefaultProps,
   type StackedProps,
 } from "@/remotion/tweet/StackedComposition";
-import type { Aspect, BackgroundConfig } from "@/remotion/tweet/types";
+import type {
+  Aspect,
+  BackgroundConfig,
+  CardTheme,
+} from "@/remotion/tweet/types";
 import { Header } from "../../_components/Header";
 
 const LOOP_LIBRARY: Array<{ id: string; label: string; src: string }> = [
@@ -95,6 +99,22 @@ export const TweetVideoStudio: React.FC = () => {
   const bgUploadUrlRef = useRef<string | null>(null);
   const [fontScale, setFontScale] = useState(1);
   const [durationSec, setDurationSec] = useState(7);
+
+  const initialProfile = getProfile(DEFAULT_PROFILE_ID);
+  const [theme, setTheme] = useState<CardTheme>(initialProfile.defaultTheme);
+  const [themeDirty, setThemeDirty] = useState(false);
+  const [showStats, setShowStats] = useState(
+    initialProfile.defaultShowStats,
+  );
+  const [showStatsDirty, setShowStatsDirty] = useState(false);
+  const [showTimestamp, setShowTimestamp] = useState(
+    initialProfile.defaultShowTimestamp,
+  );
+  const [showTimestampDirty, setShowTimestampDirty] = useState(false);
+  const [showVerifiedBadge, setShowVerifiedBadge] = useState(
+    initialProfile.defaultShowVerifiedBadge,
+  );
+  const [showVerifiedBadgeDirty, setShowVerifiedBadgeDirty] = useState(false);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -170,7 +190,19 @@ export const TweetVideoStudio: React.FC = () => {
 
   useEffect(() => {
     if (!bgDirty) setBg(profile.defaultBackground);
-  }, [profile, bgDirty]);
+    if (!themeDirty) setTheme(profile.defaultTheme);
+    if (!showStatsDirty) setShowStats(profile.defaultShowStats);
+    if (!showTimestampDirty) setShowTimestamp(profile.defaultShowTimestamp);
+    if (!showVerifiedBadgeDirty)
+      setShowVerifiedBadge(profile.defaultShowVerifiedBadge);
+  }, [
+    profile,
+    bgDirty,
+    themeDirty,
+    showStatsDirty,
+    showTimestampDirty,
+    showVerifiedBadgeDirty,
+  ]);
 
   const onBgKindChange = useCallback(
     (kind: BackgroundConfig["kind"]) => {
@@ -284,16 +316,26 @@ export const TweetVideoStudio: React.FC = () => {
         avatarUrl: profile.avatarUrl,
         verified: profile.verified,
       },
-      theme: profile.defaultTheme,
+      theme,
       background: bg,
-      showStats: profile.defaultShowStats,
-      showTimestamp: profile.defaultShowTimestamp,
-      showVerifiedBadge: profile.defaultShowVerifiedBadge,
+      showStats,
+      showTimestamp,
+      showVerifiedBadge,
       fontScale,
       centerY: 0.5,
       forRender: false,
     }),
-    [aspect, preparedTweet, profile, bg, fontScale],
+    [
+      aspect,
+      preparedTweet,
+      profile,
+      bg,
+      fontScale,
+      theme,
+      showStats,
+      showTimestamp,
+      showVerifiedBadge,
+    ],
   );
 
   const stackedInputProps = useMemo<StackedProps>(
@@ -306,16 +348,26 @@ export const TweetVideoStudio: React.FC = () => {
         avatarUrl: profile.avatarUrl,
         verified: profile.verified,
       },
-      theme: profile.defaultTheme,
+      theme,
       background: bg,
-      showStats: profile.defaultShowStats,
+      showStats,
       showTimestamp: false,
-      showVerifiedBadge: profile.defaultShowVerifiedBadge,
+      showVerifiedBadge,
       fontScale,
       muted,
       forRender: false,
     }),
-    [aspect, preparedTweet, profile, muted, bg, fontScale],
+    [
+      aspect,
+      preparedTweet,
+      profile,
+      muted,
+      bg,
+      fontScale,
+      theme,
+      showStats,
+      showVerifiedBadge,
+    ],
   );
 
   const currentComponent =
@@ -533,6 +585,88 @@ export const TweetVideoStudio: React.FC = () => {
                   Mute video audio
                 </label>
               ) : null}
+
+              <div className="flex flex-col gap-2">
+                <label
+                  className="font-sans text-xs uppercase tracking-wide"
+                  style={{ color: BRAND.colors.grey500 }}
+                >
+                  Theme
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={theme === "light" ? "default" : "outline"}
+                    onClick={() => {
+                      setTheme("light");
+                      setThemeDirty(true);
+                    }}
+                    className="flex-1"
+                  >
+                    Light
+                  </Button>
+                  <Button
+                    variant={theme === "dark" ? "default" : "outline"}
+                    onClick={() => {
+                      setTheme("dark");
+                      setThemeDirty(true);
+                    }}
+                    className="flex-1"
+                  >
+                    Dark
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label
+                  className="font-sans text-xs uppercase tracking-wide"
+                  style={{ color: BRAND.colors.grey500 }}
+                >
+                  Card rows
+                </label>
+                <label
+                  className="flex items-center gap-2 font-sans text-sm"
+                  style={{ color: BRAND.colors.ink }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showStats}
+                    onChange={(e) => {
+                      setShowStats(e.target.checked);
+                      setShowStatsDirty(true);
+                    }}
+                  />
+                  Show stats
+                </label>
+                <label
+                  className="flex items-center gap-2 font-sans text-sm"
+                  style={{ color: BRAND.colors.ink }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showTimestamp}
+                    onChange={(e) => {
+                      setShowTimestamp(e.target.checked);
+                      setShowTimestampDirty(true);
+                    }}
+                  />
+                  Show timestamp
+                </label>
+                <label
+                  className="flex items-center gap-2 font-sans text-sm"
+                  style={{ color: BRAND.colors.ink }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showVerifiedBadge}
+                    onChange={(e) => {
+                      setShowVerifiedBadge(e.target.checked);
+                      setShowVerifiedBadgeDirty(true);
+                    }}
+                  />
+                  Show verified badge
+                </label>
+              </div>
 
               <div className="flex flex-col gap-3">
                 <label
