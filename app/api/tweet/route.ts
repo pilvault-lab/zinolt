@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import type { FetchedTweet, TweetMedia } from "@/lib/tweet-fetch";
+import type { FetchedTweet, QuotedTweet, TweetMedia } from "@/lib/tweet-fetch";
 
 const ID_RE = /(?:status\/)?(\d{15,20})/;
 
@@ -26,30 +26,58 @@ function stripTrailingSelfLink(text: string): string {
   return text.replace(/\s*https:\/\/t\.co\/\w+\s*$/g, "").trimEnd();
 }
 
+interface FxTweetLike {
+  id: string;
+  text: string;
+  created_at: string;
+  author: {
+    name: string;
+    screen_name: string;
+    avatar_url: string;
+  };
+  likes: number;
+  retweets: number;
+  replies: number;
+  views?: number;
+  media?: {
+    all?: Array<{
+      type: "photo" | "video" | "gif";
+      url: string;
+      width: number;
+      height: number;
+      duration?: number;
+      thumbnail_url?: string;
+    }>;
+  };
+}
+
 interface FxTweetJson {
-  tweet?: {
-    id: string;
-    text: string;
-    created_at: string;
+  tweet?: FxTweetLike & { quote?: FxTweetLike };
+}
+
+function mapFxMedia(m: FxTweetLike["media"]): TweetMedia[] {
+  return (m?.all ?? []).map((x) => ({
+    type: x.type,
+    url: proxyMediaUrl(x.url),
+    width: x.width,
+    height: x.height,
+    durationMs: x.duration ? Math.round(x.duration * 1000) : undefined,
+    thumbnailUrl: x.thumbnail_url ? proxyMediaUrl(x.thumbnail_url) : undefined,
+  }));
+}
+
+function mapFxQuote(q: FxTweetLike): QuotedTweet {
+  return {
+    id: q.id,
+    text: stripTrailingSelfLink(decodeEntities(q.text)),
     author: {
-      name: string;
-      screen_name: string;
-      avatar_url: string;
-    };
-    likes: number;
-    retweets: number;
-    replies: number;
-    views?: number;
-    media?: {
-      all?: Array<{
-        type: "photo" | "video" | "gif";
-        url: string;
-        width: number;
-        height: number;
-        duration?: number;
-        thumbnail_url?: string;
-      }>;
-    };
+      name: q.author.name,
+      handle: q.author.screen_name,
+      avatarUrl: proxyMediaUrl(q.author.avatar_url),
+      verified: false,
+    },
+    createdAt: q.created_at,
+    media: mapFxMedia(q.media),
   };
 }
 
@@ -59,14 +87,7 @@ async function fetchFx(id: string): Promise<FetchedTweet | null> {
   const json = (await res.json()) as FxTweetJson;
   const t = json.tweet;
   if (!t) return null;
-  const media: TweetMedia[] = (t.media?.all ?? []).map((m) => ({
-    type: m.type,
-    url: proxyMediaUrl(m.url),
-    width: m.width,
-    height: m.height,
-    durationMs: m.duration ? Math.round(m.duration * 1000) : undefined,
-    thumbnailUrl: m.thumbnail_url ? proxyMediaUrl(m.thumbnail_url) : undefined,
-  }));
+  const media = mapFxMedia(t.media);
   const text = stripTrailingSelfLink(decodeEntities(t.text));
   return {
     id: t.id,
@@ -85,7 +106,36 @@ async function fetchFx(id: string): Promise<FetchedTweet | null> {
       views: t.views,
     },
     media,
+    quoted: t.quote ? mapFxQuote(t.quote) : undefined,
   };
+}
+
+interface SynMediaDetail {
+  type: "photo" | "video" | "animated_gif";
+  media_url_https: string;
+  original_info?: { width: number; height: number };
+  video_info?: {
+    duration_millis?: number;
+    variants: Array<{
+      content_type: string;
+      bitrate?: number;
+      url: string;
+    }>;
+  };
+}
+
+interface SynQuotedTweet {
+  id_str: string;
+  text: string;
+  created_at: string;
+  user: {
+    name: string;
+    screen_name: string;
+    profile_image_url_https: string;
+    is_blue_verified?: boolean;
+    verified?: boolean;
+  };
+  mediaDetails?: SynMediaDetail[];
 }
 
 interface SynTweetJson {
@@ -101,31 +151,13 @@ interface SynTweetJson {
   };
   favorite_count?: number;
   conversation_count?: number;
-  mediaDetails?: Array<{
-    type: "photo" | "video" | "animated_gif";
-    media_url_https: string;
-    original_info?: { width: number; height: number };
-    video_info?: {
-      duration_millis?: number;
-      variants: Array<{
-        content_type: string;
-        bitrate?: number;
-        url: string;
-      }>;
-    };
-  }>;
+  mediaDetails?: SynMediaDetail[];
+  quoted_tweet?: SynQuotedTweet;
 }
 
-async function fetchSyndication(id: string): Promise<FetchedTweet | null> {
-  const res = await fetch(
-    `https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=x`,
-    { headers: { "User-Agent": "Mozilla/5.0" } },
-  );
-  if (!res.ok) return null;
-  const json = (await res.json()) as SynTweetJson;
-
+function mapSynMedia(details: SynMediaDetail[] | undefined): TweetMedia[] {
   const media: TweetMedia[] = [];
-  for (const m of json.mediaDetails ?? []) {
+  for (const m of details ?? []) {
     if (m.type === "photo") {
       media.push({
         type: "photo",
@@ -151,7 +183,34 @@ async function fetchSyndication(id: string): Promise<FetchedTweet | null> {
       }
     }
   }
+  return media;
+}
 
+function mapSynQuote(q: SynQuotedTweet): QuotedTweet {
+  const rawText = decodeEntities(q.text.replace(/<[^>]+>/g, ""));
+  return {
+    id: q.id_str,
+    text: stripTrailingSelfLink(rawText),
+    author: {
+      name: q.user.name,
+      handle: q.user.screen_name,
+      avatarUrl: proxyMediaUrl(q.user.profile_image_url_https),
+      verified: Boolean(q.user.is_blue_verified || q.user.verified),
+    },
+    createdAt: q.created_at,
+    media: mapSynMedia(q.mediaDetails),
+  };
+}
+
+async function fetchSyndication(id: string): Promise<FetchedTweet | null> {
+  const res = await fetch(
+    `https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=x`,
+    { headers: { "User-Agent": "Mozilla/5.0" } },
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as SynTweetJson;
+
+  const media = mapSynMedia(json.mediaDetails);
   const rawText = decodeEntities(json.text.replace(/<[^>]+>/g, ""));
 
   return {
@@ -170,6 +229,7 @@ async function fetchSyndication(id: string): Promise<FetchedTweet | null> {
       replies: json.conversation_count ?? 0,
     },
     media,
+    quoted: json.quoted_tweet ? mapSynQuote(json.quoted_tweet) : undefined,
   };
 }
 

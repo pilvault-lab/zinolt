@@ -15,6 +15,7 @@ export interface FetchedTweet {
     views?: number;
   };
   media: TweetMedia[];
+  quoted?: QuotedTweet;
 }
 
 export interface TweetMedia {
@@ -24,6 +25,19 @@ export interface TweetMedia {
   height: number;
   durationMs?: number;
   thumbnailUrl?: string;
+}
+
+export interface QuotedTweet {
+  id: string;
+  text: string;
+  author: {
+    name: string;
+    handle: string;
+    avatarUrl: string;
+    verified: boolean;
+  };
+  createdAt: string;
+  media: TweetMedia[];
 }
 
 export type TweetFetchError =
