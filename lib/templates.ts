@@ -74,6 +74,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/dangle/dangle-preview.svg",
     href: "/dangle",
   },
+  {
+    id: "tweet-video",
+    compositionId: "TweetInCard9x16",
+    label: "Tweet to Video",
+    background: "",
+    preview: "/tweet-video/preview.png",
+    href: "/tweet-video",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
