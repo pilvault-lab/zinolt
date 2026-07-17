@@ -87,9 +87,21 @@ export const TweetCard: React.FC<TweetCardProps> = ({
   fontScale = 1,
   forRender = false,
 }) => {
-  const bg = theme === "dark" ? "#15202B" : "#FFFFFF";
-  const ink = theme === "dark" ? "#E7E9EA" : "#0F1419";
-  const muted = theme === "dark" ? "#71767B" : "#536471";
+  // Frosted glass tokens reused from FrostedSurface (glassOpacity 0.15,
+  // blur(25px), 1px border at 20% white). Dark theme uses those directly.
+  // Light theme raises the glass opacity so the card stays visible on bright
+  // backgrounds and switches the border to a soft ink stroke.
+  const bg =
+    theme === "dark"
+      ? "rgba(255, 255, 255, 0.15)"
+      : "rgba(255, 255, 255, 0.6)";
+  const border =
+    theme === "dark"
+      ? "1px solid rgba(255, 255, 255, 0.2)"
+      : "1px solid rgba(15, 20, 25, 0.08)";
+  const ink = theme === "dark" ? "#FFFFFF" : "#0F1419";
+  const muted =
+    theme === "dark" ? "rgba(255, 255, 255, 0.72)" : "#536471";
 
   const baseSize = bucketFontSize(tweet.text.length);
   const textSize = Math.round(baseSize * fontScale);
@@ -124,9 +136,15 @@ export const TweetCard: React.FC<TweetCardProps> = ({
         maxWidth: maxWidthPx,
         width: "100%",
         backgroundColor: bg,
+        border,
         borderRadius: cornerRadius,
         padding: "28px 32px",
-        boxShadow: "0 8px 40px rgba(0, 0, 0, 0.25)",
+        boxShadow:
+          theme === "dark"
+            ? "0 12px 48px rgba(0, 0, 0, 0.42)"
+            : "0 12px 48px rgba(0, 0, 0, 0.15)",
+        backdropFilter: "blur(25px)",
+        WebkitBackdropFilter: "blur(25px)",
         fontFamily: FONT_STACK,
         transform: `scale(${scale})`,
         transformOrigin: "center center",
@@ -218,7 +236,9 @@ export const TweetCard: React.FC<TweetCardProps> = ({
             alignItems: "center",
             paddingTop: 12,
             borderTop:
-              theme === "dark" ? "1px solid #2F3336" : "1px solid #EFF3F4",
+              theme === "dark"
+                ? "1px solid rgba(255,255,255,0.12)"
+                : "1px solid rgba(15,20,25,0.08)",
           }}
         >
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
