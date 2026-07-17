@@ -33,6 +33,11 @@ import {
   inCardDefaultProps,
   type InCardProps,
 } from "@/remotion/tweet/InCardComposition";
+import {
+  StackedComposition,
+  stackedDefaultProps,
+  type StackedProps,
+} from "@/remotion/tweet/StackedComposition";
 import type { Aspect } from "@/remotion/tweet/types";
 import { Header } from "../../_components/Header";
 
@@ -66,6 +71,9 @@ export const TweetVideoStudio: React.FC = () => {
 
   const [profileId, setProfileId] = useState<string>(DEFAULT_PROFILE_ID);
   const [aspect, setAspect] = useState<Aspect>("9x16");
+  const [layout, setLayout] = useState<"incard" | "stacked">("incard");
+  const [layoutDirty, setLayoutDirty] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -132,6 +140,14 @@ export const TweetVideoStudio: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!preparedTweet || layoutDirty) return;
+    const hasVideo = preparedTweet.media.some(
+      (m) => m.type === "video" || m.type === "gif",
+    );
+    setLayout(hasVideo ? "stacked" : "incard");
+  }, [preparedTweet, layoutDirty]);
+
+  useEffect(() => {
     let cancelled = false;
     const dims = ASPECT_DIMS[aspect];
     canRenderMediaOnWeb({
@@ -169,7 +185,24 @@ export const TweetVideoStudio: React.FC = () => {
     [urlInput],
   );
 
-  const inputProps = useMemo<InCardProps>(
+  const durationFrames = useMemo(() => {
+    if (!preparedTweet) return COMP_DURATION_FRAMES;
+    const vid = preparedTweet.media.find(
+      (m) => m.type === "video" || m.type === "gif",
+    );
+    if (layout === "stacked" && vid?.durationMs) {
+      return Math.max(30, Math.ceil((vid.durationMs / 1000) * COMP_FPS));
+    }
+    if (layout === "incard" && vid?.durationMs) {
+      return Math.max(
+        30,
+        Math.ceil(((vid.durationMs + 1000) / 1000) * COMP_FPS),
+      );
+    }
+    return COMP_DURATION_FRAMES;
+  }, [preparedTweet, layout]);
+
+  const inCardInputProps = useMemo<InCardProps>(
     () => ({
       aspect,
       tweet: preparedTweet ?? inCardDefaultProps.tweet,
@@ -191,6 +224,39 @@ export const TweetVideoStudio: React.FC = () => {
     [aspect, preparedTweet, profile],
   );
 
+  const stackedInputProps = useMemo<StackedProps>(
+    () => ({
+      aspect,
+      tweet: preparedTweet ?? stackedDefaultProps.tweet,
+      identity: {
+        name: profile.displayName,
+        handle: profile.handle,
+        avatarUrl: profile.avatarUrl,
+        verified: profile.verified,
+      },
+      theme: profile.defaultTheme,
+      background: profile.defaultBackground,
+      showStats: profile.defaultShowStats,
+      showTimestamp: false,
+      showVerifiedBadge: profile.defaultShowVerifiedBadge,
+      fontScale: 1,
+      muted,
+      forRender: false,
+    }),
+    [aspect, preparedTweet, profile, muted],
+  );
+
+  const currentComponent =
+    layout === "stacked" ? StackedComposition : InCardComposition;
+  const currentProps =
+    layout === "stacked" ? stackedInputProps : inCardInputProps;
+  const currentDefaultProps =
+    layout === "stacked" ? stackedDefaultProps : inCardDefaultProps;
+  const currentCompId =
+    layout === "stacked"
+      ? `TweetStacked${aspect}`
+      : `TweetInCard${aspect}`;
+
   const compDims = ASPECT_DIMS[aspect];
   const playerW = Math.min(PLAYER_MAX_W, compDims.w);
   const playerH = (playerW * compDims.h) / compDims.w;
@@ -204,23 +270,25 @@ export const TweetVideoStudio: React.FC = () => {
       const { getBlob } = await renderMediaOnWeb({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         composition: {
-          id: `TweetInCard${aspect}`,
-          component: InCardComposition,
-          durationInFrames: COMP_DURATION_FRAMES,
+          id: currentCompId,
+          component: currentComponent,
+          durationInFrames: durationFrames,
           fps: COMP_FPS,
           width: compDims.w,
           height: compDims.h,
-          defaultProps: inCardDefaultProps,
+          defaultProps: currentDefaultProps,
         } as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         inputProps: {
-          ...inputProps,
+          ...currentProps,
           forRender: true,
         } as any,
         licenseKey: "free-license",
-        videoBitrate: 12_000_000,
+        videoBitrate: layout === "stacked" ? 16_000_000 : 12_000_000,
         hardwareAcceleration: "prefer-hardware",
-        muted: true,
+        ...(layout === "stacked" && !muted
+          ? { audioBitrate: "high" as const }
+          : { muted: true }),
         onProgress: ({ progress: p }) => setProgress(p),
       });
       const blob = await getBlob();
@@ -240,7 +308,19 @@ export const TweetVideoStudio: React.FC = () => {
     } finally {
       setIsRendering(false);
     }
-  }, [preparedTweet, aspect, compDims, inputProps, profile]);
+  }, [
+    preparedTweet,
+    aspect,
+    compDims,
+    currentProps,
+    profile,
+    currentComponent,
+    currentDefaultProps,
+    currentCompId,
+    durationFrames,
+    layout,
+    muted,
+  ]);
 
   return (
     <div
@@ -328,16 +408,65 @@ export const TweetVideoStudio: React.FC = () => {
 
       <div className="flex flex-1 min-h-0">
         <aside
-          className="flex flex-col gap-6 p-6"
+          className="flex flex-col gap-6 overflow-y-auto p-6"
           style={{
             width: 320,
             backgroundColor: BRAND.colors.paper,
             borderRight: `1px solid ${BRAND.colors.grey200}`,
           }}
         >
-          <p className="text-xs" style={{ color: BRAND.colors.grey500 }}>
-            Controls appear here as the tweet loads.
-          </p>
+          {preparedTweet ? (
+            <>
+              <div className="flex flex-col gap-2">
+                <label
+                  className="font-sans text-xs uppercase tracking-wide"
+                  style={{ color: BRAND.colors.grey500 }}
+                >
+                  Layout
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={layout === "incard" ? "default" : "outline"}
+                    onClick={() => {
+                      setLayout("incard");
+                      setLayoutDirty(true);
+                    }}
+                    className="flex-1"
+                  >
+                    In-Card
+                  </Button>
+                  <Button
+                    variant={layout === "stacked" ? "default" : "outline"}
+                    onClick={() => {
+                      setLayout("stacked");
+                      setLayoutDirty(true);
+                    }}
+                    className="flex-1"
+                  >
+                    Stacked
+                  </Button>
+                </div>
+              </div>
+
+              {preparedTweet.media.some((m) => m.type === "video") ? (
+                <label
+                  className="flex items-center gap-2 font-sans text-sm"
+                  style={{ color: BRAND.colors.ink }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={muted}
+                    onChange={(e) => setMuted(e.target.checked)}
+                  />
+                  Mute video audio
+                </label>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-xs" style={{ color: BRAND.colors.grey500 }}>
+              Controls appear here as the tweet loads.
+            </p>
+          )}
         </aside>
 
         <main
@@ -347,15 +476,15 @@ export const TweetVideoStudio: React.FC = () => {
           {preparedTweet ? (
             <Player
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              component={InCardComposition as any}
-              durationInFrames={COMP_DURATION_FRAMES}
+              component={currentComponent as any}
+              durationInFrames={durationFrames}
               fps={COMP_FPS}
               compositionWidth={compDims.w}
               compositionHeight={compDims.h}
               controls
               loop
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              inputProps={inputProps as any}
+              inputProps={currentProps as any}
               style={{ width: playerW, height: playerH }}
             />
           ) : (

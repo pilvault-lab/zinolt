@@ -6,14 +6,25 @@ import {
   InCardComposition,
   inCardDefaultProps,
 } from "./tweet/InCardComposition";
+import {
+  StackedComposition,
+  stackedDefaultProps,
+} from "./tweet/StackedComposition";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
+const STACKED_MAX_DURATION = 30 * 12;
 
 const TWEET_ASPECTS = [
   { id: "TweetInCard9x16", aspect: "9x16" as const, width: 1080, height: 1920 },
   { id: "TweetInCard1x1", aspect: "1x1" as const, width: 1080, height: 1080 },
   { id: "TweetInCard16x9", aspect: "16x9" as const, width: 1920, height: 1080 },
+];
+
+const STACKED_ASPECTS = [
+  { id: "TweetStacked9x16", aspect: "9x16" as const, width: 1080, height: 1920 },
+  { id: "TweetStacked1x1", aspect: "1x1" as const, width: 1080, height: 1080 },
+  { id: "TweetStacked16x9", aspect: "16x9" as const, width: 1920, height: 1080 },
 ];
 
 export const RemotionRoot: React.FC = () => (
@@ -51,6 +62,18 @@ export const RemotionRoot: React.FC = () => (
         width={width}
         height={height}
         defaultProps={{ ...inCardDefaultProps, aspect }}
+      />
+    ))}
+    {STACKED_ASPECTS.map(({ id, aspect, width, height }) => (
+      <Composition
+        key={id}
+        id={id}
+        component={StackedComposition}
+        durationInFrames={STACKED_MAX_DURATION}
+        fps={TWEET_FPS}
+        width={width}
+        height={height}
+        defaultProps={{ ...stackedDefaultProps, aspect }}
       />
     ))}
   </>
