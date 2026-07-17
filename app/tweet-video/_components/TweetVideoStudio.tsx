@@ -93,6 +93,8 @@ export const TweetVideoStudio: React.FC = () => {
   );
   const [bgDirty, setBgDirty] = useState(false);
   const bgUploadUrlRef = useRef<string | null>(null);
+  const [fontScale, setFontScale] = useState(1);
+  const [durationSec, setDurationSec] = useState(7);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -269,8 +271,8 @@ export const TweetVideoStudio: React.FC = () => {
         Math.ceil(((vid.durationMs + 1000) / 1000) * COMP_FPS),
       );
     }
-    return COMP_DURATION_FRAMES;
-  }, [preparedTweet, layout]);
+    return Math.round(durationSec * COMP_FPS);
+  }, [preparedTweet, layout, durationSec]);
 
   const inCardInputProps = useMemo<InCardProps>(
     () => ({
@@ -287,11 +289,11 @@ export const TweetVideoStudio: React.FC = () => {
       showStats: profile.defaultShowStats,
       showTimestamp: profile.defaultShowTimestamp,
       showVerifiedBadge: profile.defaultShowVerifiedBadge,
-      fontScale: 1,
+      fontScale,
       centerY: 0.5,
       forRender: false,
     }),
-    [aspect, preparedTweet, profile, bg],
+    [aspect, preparedTweet, profile, bg, fontScale],
   );
 
   const stackedInputProps = useMemo<StackedProps>(
@@ -309,11 +311,11 @@ export const TweetVideoStudio: React.FC = () => {
       showStats: profile.defaultShowStats,
       showTimestamp: false,
       showVerifiedBadge: profile.defaultShowVerifiedBadge,
-      fontScale: 1,
+      fontScale,
       muted,
       forRender: false,
     }),
-    [aspect, preparedTweet, profile, muted, bg],
+    [aspect, preparedTweet, profile, muted, bg, fontScale],
   );
 
   const currentComponent =
@@ -635,6 +637,63 @@ export const TweetVideoStudio: React.FC = () => {
                   />
                 ) : null}
               </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between">
+                  <label
+                    className="font-sans text-xs uppercase tracking-wide"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    Font scale
+                  </label>
+                  <span
+                    className="font-sans text-[11px] tabular-nums"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    {Math.round(fontScale * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.7}
+                  max={1.4}
+                  step={0.05}
+                  value={fontScale}
+                  onChange={(e) => setFontScale(Number(e.target.value))}
+                  style={{ accentColor: BRAND.colors.ink }}
+                />
+              </div>
+
+              {layout === "incard" &&
+              !preparedTweet.media.some(
+                (m) => m.type === "video" || m.type === "gif",
+              ) ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-baseline justify-between">
+                    <label
+                      className="font-sans text-xs uppercase tracking-wide"
+                      style={{ color: BRAND.colors.grey500 }}
+                    >
+                      Duration
+                    </label>
+                    <span
+                      className="font-sans text-[11px] tabular-nums"
+                      style={{ color: BRAND.colors.grey500 }}
+                    >
+                      {durationSec}s
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={4}
+                    max={15}
+                    step={1}
+                    value={durationSec}
+                    onChange={(e) => setDurationSec(Number(e.target.value))}
+                    style={{ accentColor: BRAND.colors.ink }}
+                  />
+                </div>
+              ) : null}
             </>
           ) : (
             <p className="text-xs" style={{ color: BRAND.colors.grey500 }}>
