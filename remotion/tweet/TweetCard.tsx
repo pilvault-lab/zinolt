@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Img, continueRender, delayRender } from "remotion";
 import { TweetText } from "./TweetText";
 import { TweetMediaGrid } from "./TweetMediaGrid";
+import { QuotedTweetCard } from "./QuotedTweetCard";
 import type { TweetCardProps } from "./types";
 
 const FONT_STACK =
@@ -127,7 +128,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
       continueRender(handle);
     });
     return () => cancelAnimationFrame(raf);
-  }, [handle, tweet.text, tweet.media.length]);
+  }, [handle, tweet.text, tweet.media.length, tweet.quoted?.id]);
 
   return (
     <div
@@ -214,6 +215,16 @@ export const TweetCard: React.FC<TweetCardProps> = ({
         <div style={{ marginTop: 20 }}>
           <TweetMediaGrid media={tweet.media} forRender={forRender} />
         </div>
+      ) : null}
+
+      {tweet.quoted ? (
+        <QuotedTweetCard
+          quote={tweet.quoted}
+          theme={theme}
+          outerTextSize={textSize}
+          showVerifiedBadge={showVerifiedBadge}
+          forRender={forRender}
+        />
       ) : null}
 
       {showTimestamp ? (
