@@ -1,9 +1,12 @@
 // Twemoji SVG mapping. Assets served from jsDelivr — we don't bundle the
 // ~10MB SVG set into the repo. Remotion's <Img> delayRender()s until the
 // URL resolves, so this is transparent at render time.
-
+//
+// Uses jdecked/twemoji (the maintained fork — Twitter's original repo is
+// archived at 14.0.2 and lacks Unicode 15+ emojis like 🩵 1fa75). 15.1.0
+// covers everything through Unicode 15.1.
 const CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg";
+  "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg";
 
 export type Segment =
   | { type: "text"; value: string }

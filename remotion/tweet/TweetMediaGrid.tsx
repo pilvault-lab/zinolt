@@ -78,6 +78,9 @@ export const TweetMediaGrid: React.FC<{
       >
         <Img
           src={p.url}
+          onError={() => {
+            /* swallow — missing tweet media renders as empty box */
+          }}
           style={{
             width: "100%",
             height: "100%",

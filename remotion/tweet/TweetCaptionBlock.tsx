@@ -94,6 +94,9 @@ export const TweetCaptionBlock: React.FC<TweetCaptionBlockProps> = ({
         {identity.avatarUrl ? (
           <Img
             src={identity.avatarUrl}
+            onError={() => {
+              /* swallow — missing avatar doesn't fail the render */
+            }}
             style={{
               width: avatarSize,
               height: avatarSize,

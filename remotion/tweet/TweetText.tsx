@@ -2,6 +2,14 @@ import React from "react";
 import { Img } from "remotion";
 import { splitTwemoji } from "@/lib/twemoji";
 
+// Absorb 404s so a missing emoji doesn't cancel the whole render. Remotion's
+// default onError calls cancelRender; supplying our own turns the failure
+// into "just don't render this emoji". Unicode moves faster than the twemoji
+// asset packs, so we always want to degrade gracefully rather than fail.
+const swallowImgError = () => {
+  /* intentionally empty */
+};
+
 export const TweetText: React.FC<{
   text: string;
   fontSize: number;
@@ -28,6 +36,7 @@ export const TweetText: React.FC<{
               <Img
                 key={i}
                 src={seg.url}
+                onError={swallowImgError}
                 style={{
                   height: "1em",
                   width: "1em",

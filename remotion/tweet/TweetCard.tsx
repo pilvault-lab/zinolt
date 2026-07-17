@@ -154,6 +154,9 @@ export const TweetCard: React.FC<TweetCardProps> = ({
         {identity.avatarUrl ? (
           <Img
             src={identity.avatarUrl}
+            onError={() => {
+              /* swallow — missing avatar doesn't fail the render */
+            }}
             style={{
               width: 56,
               height: 56,
