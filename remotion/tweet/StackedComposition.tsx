@@ -7,7 +7,7 @@ import {
   useCurrentFrame,
 } from "remotion";
 import { Video as MediaVideo } from "@remotion/media";
-import { TweetCard } from "./TweetCard";
+import { TweetCaptionBlock } from "./TweetCaptionBlock";
 import type {
   Aspect,
   BackgroundConfig,
@@ -16,25 +16,30 @@ import type {
 } from "./types";
 import type { FetchedTweet, TweetMedia } from "@/lib/tweet-fetch";
 
-const CARD_MAX_WIDTH: Record<Aspect, number> = {
-  "9x16": 780,
-  "1x1": 720,
-  "16x9": 640,
+// Caption zone occupies a percentage of the composition width. The caption
+// text block is left-aligned inside this padded slot.
+const CAPTION_HORIZ_PAD: Record<Aspect, number> = {
+  "9x16": 64,
+  "1x1": 56,
+  "16x9": 96,
 };
 
-const VIDEO_ZONE: Record<
-  Aspect,
-  { widthPct: number; heightPct: number; topPct: number }
-> = {
-  "9x16": { widthPct: 92, heightPct: 55, topPct: 30 },
-  "1x1": { widthPct: 84, heightPct: 60, topPct: 26 },
-  "16x9": { widthPct: 55, heightPct: 78, topPct: 12 },
+const CAPTION_TOP_PAD: Record<Aspect, number> = {
+  "9x16": 84,
+  "1x1": 60,
+  "16x9": 56,
 };
 
-const CARD_TOP: Record<Aspect, number> = {
-  "9x16": 4,
-  "1x1": 3,
-  "16x9": 2,
+const CAPTION_BOTTOM_PAD: Record<Aspect, number> = {
+  "9x16": 40,
+  "1x1": 32,
+  "16x9": 24,
+};
+
+const VIDEO_BOTTOM_PAD: Record<Aspect, number> = {
+  "9x16": 84,
+  "1x1": 60,
+  "16x9": 40,
 };
 
 const isAbsoluteUrl = (s: string) => /^(blob:|data:|https?:|file:|\/)/i.test(s);
@@ -67,6 +72,7 @@ export type StackedProps = {
   showTimestamp: boolean;
   showVerifiedBadge: boolean;
   fontScale: number;
+  captionScale: number;
   muted: boolean;
   forRender: boolean;
 };
@@ -93,6 +99,7 @@ export const stackedDefaultProps: StackedProps = {
   showTimestamp: false,
   showVerifiedBadge: false,
   fontScale: 1,
+  captionScale: 1,
   muted: false,
   forRender: false,
 };
@@ -107,25 +114,37 @@ export const StackedComposition: React.FC<StackedProps> = ({
   identity,
   theme,
   background,
-  showStats,
-  showTimestamp,
   showVerifiedBadge,
   fontScale,
+  captionScale,
   muted,
   forRender,
 }) => {
   const frame = useCurrentFrame();
-  const cardOpacity = interpolate(frame, [0, 10], [0, 1], {
+  const captionOpacity = interpolate(frame, [0, 10], [0, 1], {
     extrapolateRight: "clamp",
   });
 
   const video = pickVideo(tweet.media);
   const videoSrc = video ? resolveSrc(video.url) : "";
   const isGif = video?.type === "gif";
-  const zone = VIDEO_ZONE[aspect];
+
+  const captionHPad = CAPTION_HORIZ_PAD[aspect];
+  const captionTopPad = CAPTION_TOP_PAD[aspect];
+  const captionBottomPad = CAPTION_BOTTOM_PAD[aspect];
+  const videoBottomPad = VIDEO_BOTTOM_PAD[aspect];
+
+  // Caption text block width — scale with captionScale, but never wider than
+  // the padded slot.
+  const captionWidthBase =
+    aspect === "16x9" ? 1000 : aspect === "1x1" ? 900 : 900;
+  const captionWidth = Math.round(captionWidthBase * captionScale);
 
   return (
     <AbsoluteFill>
+      {/* Layer 1 — full-frame background: blurred video if we have one, else
+          the configured solid / gradient / (loop is treated as solid black for
+          Stacked since the whole point is the tweet's own video). */}
       {video ? (
         <AbsoluteFill>
           {forRender ? (
@@ -136,7 +155,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                filter: "blur(40px) brightness(0.6)",
+                filter: "blur(40px) brightness(0.55)",
               }}
             />
           ) : (
@@ -147,7 +166,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                filter: "blur(40px) brightness(0.6)",
+                filter: "blur(40px) brightness(0.55)",
               }}
             />
           )}
@@ -156,76 +175,85 @@ export const StackedComposition: React.FC<StackedProps> = ({
         <SolidOrGradient bg={background} />
       )}
 
-      {video ? (
-        <AbsoluteFill
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              width: `${zone.widthPct}%`,
-              height: `${zone.heightPct}%`,
-              marginTop: `${zone.topPct - 50}%`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-          >
-            {forRender ? (
-              <MediaVideo
-                src={videoSrc}
-                muted={muted || isGif}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  objectFit: "contain",
-                  borderRadius: 16,
-                }}
-              />
-            ) : (
-              <OffthreadVideo
-                src={videoSrc}
-                muted={muted || isGif}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  objectFit: "contain",
-                  borderRadius: 16,
-                }}
-              />
-            )}
-          </div>
-        </AbsoluteFill>
-      ) : null}
-
+      {/* Layer 2 — vertical stack: caption block up top (auto height), video
+          zone below (fills remaining space). Two distinct zones that never
+          overlap. */}
       <AbsoluteFill
         style={{
           display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "center",
-          paddingTop: `${CARD_TOP[aspect]}%`,
-          paddingLeft: "4%",
-          paddingRight: "4%",
-          opacity: cardOpacity,
+          flexDirection: "column",
+          alignItems: "stretch",
+          justifyContent: "flex-start",
+          paddingTop: captionTopPad,
+          paddingLeft: captionHPad,
+          paddingRight: captionHPad,
+          paddingBottom: videoBottomPad,
         }}
       >
-        <TweetCard
-          tweet={tweet}
-          identity={identity}
-          theme={theme}
-          showStats={showStats}
-          showTimestamp={showTimestamp}
-          showVerifiedBadge={showVerifiedBadge}
-          inCardMedia={false}
-          maxWidthPx={CARD_MAX_WIDTH[aspect]}
-          cornerRadius={18}
-          fontScale={fontScale}
-          forRender={forRender}
-        />
+        {/* Caption — chromeless. No card container, no fill, no border. */}
+        <div style={{ opacity: captionOpacity, marginBottom: captionBottomPad }}>
+          <TweetCaptionBlock
+            tweet={tweet}
+            identity={identity}
+            theme={theme}
+            showVerifiedBadge={showVerifiedBadge}
+            widthPx={captionWidth}
+            fontScale={fontScale}
+            captionScale={captionScale}
+          />
+        </div>
+
+        {/* Video zone fills remaining space, centered within it. */}
+        {video ? (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {forRender ? (
+                <MediaVideo
+                  src={videoSrc}
+                  muted={muted || isGif}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    borderRadius: 20,
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <OffthreadVideo
+                  src={videoSrc}
+                  muted={muted || isGif}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    borderRadius: 20,
+                    display: "block",
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1 }} />
+        )}
       </AbsoluteFill>
     </AbsoluteFill>
   );

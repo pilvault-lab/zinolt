@@ -354,6 +354,7 @@ export const TweetVideoStudio: React.FC = () => {
       showTimestamp: false,
       showVerifiedBadge,
       fontScale,
+      captionScale: 1,
       muted,
       forRender: false,
     }),
