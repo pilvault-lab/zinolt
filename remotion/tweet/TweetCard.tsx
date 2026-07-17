@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Img, continueRender, delayRender } from "remotion";
 import { TweetText } from "./TweetText";
+import { TweetMediaGrid } from "./TweetMediaGrid";
 import type { TweetCardProps } from "./types";
 
 const FONT_STACK =
@@ -84,6 +85,7 @@ export const TweetCard: React.FC<TweetCardProps> = ({
   maxWidthPx,
   cornerRadius,
   fontScale = 1,
+  forRender = false,
 }) => {
   const bg = theme === "dark" ? "#15202B" : "#FFFFFF";
   const ink = theme === "dark" ? "#E7E9EA" : "#0F1419";
@@ -188,15 +190,9 @@ export const TweetCard: React.FC<TweetCardProps> = ({
       </div>
 
       {inCardMedia && tweet.media.length > 0 ? (
-        <div
-          style={{
-            marginTop: 20,
-            width: "100%",
-            aspectRatio: "16 / 9",
-            borderRadius: 12,
-            backgroundColor: theme === "dark" ? "#22303C" : "#EFF3F4",
-          }}
-        />
+        <div style={{ marginTop: 20 }}>
+          <TweetMediaGrid media={tweet.media} forRender={forRender} />
+        </div>
       ) : null}
 
       {showTimestamp ? (
