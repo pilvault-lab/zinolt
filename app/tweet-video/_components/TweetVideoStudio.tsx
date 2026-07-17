@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Player } from "@remotion/player";
 import {
@@ -22,6 +22,12 @@ import {
   PAGE_PROFILES,
   getProfile,
 } from "@/lib/page-profiles";
+import {
+  deleteLocalVideo,
+  prepareLocalVideoSW,
+  pingLocalVideoSW,
+  storeLocalVideo,
+} from "@/lib/local-video";
 import {
   InCardComposition,
   inCardDefaultProps,
@@ -53,6 +59,8 @@ function slugify(s: string, max: number): string {
 export const TweetVideoStudio: React.FC = () => {
   const [urlInput, setUrlInput] = useState("");
   const [tweet, setTweet] = useState<FetchedTweet | null>(null);
+  const [preparedTweet, setPreparedTweet] = useState<FetchedTweet | null>(null);
+  const [preparingMedia, setPreparingMedia] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
@@ -65,6 +73,63 @@ export const TweetVideoStudio: React.FC = () => {
   const [exportError, setExportError] = useState("");
 
   const profile = useMemo(() => getProfile(profileId), [profileId]);
+  const preparedSwUrlsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    prepareLocalVideoSW();
+    const id = setInterval(pingLocalVideoSW, 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!tweet) {
+      setPreparedTweet(null);
+      return;
+    }
+    let cancelled = false;
+    const localUrlsCreated: string[] = [];
+    setPreparingMedia(true);
+
+    (async () => {
+      const newMedia = await Promise.all(
+        tweet.media.map(async (m) => {
+          if (m.type === "photo") return m;
+          try {
+            const res = await fetch(m.url);
+            if (!res.ok) throw new Error(`fetch ${res.status}`);
+            const blob = await res.blob();
+            const file = new File([blob], `${tweet.id}.mp4`, {
+              type: blob.type || "video/mp4",
+            });
+            const swUrl = await storeLocalVideo(file);
+            localUrlsCreated.push(swUrl);
+            return { ...m, url: swUrl };
+          } catch (e) {
+            console.warn("Media prep failed", e);
+            return m;
+          }
+        }),
+      );
+      if (cancelled) {
+        for (const u of localUrlsCreated) void deleteLocalVideo(u);
+        return;
+      }
+      for (const u of preparedSwUrlsRef.current) void deleteLocalVideo(u);
+      preparedSwUrlsRef.current = localUrlsCreated;
+      setPreparedTweet({ ...tweet, media: newMedia });
+      setPreparingMedia(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tweet]);
+
+  useEffect(() => {
+    return () => {
+      for (const u of preparedSwUrlsRef.current) void deleteLocalVideo(u);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,7 +172,7 @@ export const TweetVideoStudio: React.FC = () => {
   const inputProps = useMemo<InCardProps>(
     () => ({
       aspect,
-      tweet: tweet ?? inCardDefaultProps.tweet,
+      tweet: preparedTweet ?? inCardDefaultProps.tweet,
       identity: {
         name: profile.displayName,
         handle: profile.handle,
@@ -123,7 +188,7 @@ export const TweetVideoStudio: React.FC = () => {
       centerY: 0.5,
       forRender: false,
     }),
-    [aspect, tweet, profile],
+    [aspect, preparedTweet, profile],
   );
 
   const compDims = ASPECT_DIMS[aspect];
@@ -131,7 +196,7 @@ export const TweetVideoStudio: React.FC = () => {
   const playerH = (playerW * compDims.h) / compDims.w;
 
   const handleDownload = useCallback(async () => {
-    if (!tweet) return;
+    if (!preparedTweet) return;
     setExportError("");
     setIsRendering(true);
     setProgress(0);
@@ -162,7 +227,7 @@ export const TweetVideoStudio: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${profile.id}_${slugify(tweet.text, 40)}_${aspect}.mp4`;
+      a.download = `${profile.id}_${slugify(preparedTweet.text, 40)}_${aspect}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -175,7 +240,7 @@ export const TweetVideoStudio: React.FC = () => {
     } finally {
       setIsRendering(false);
     }
-  }, [tweet, aspect, compDims, inputProps, profile]);
+  }, [preparedTweet, aspect, compDims, inputProps, profile]);
 
   return (
     <div
@@ -279,7 +344,7 @@ export const TweetVideoStudio: React.FC = () => {
           className="flex flex-1 items-center justify-center"
           style={{ backgroundColor: "#5A5A60", padding: 48 }}
         >
-          {tweet ? (
+          {preparedTweet ? (
             <Player
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               component={InCardComposition as any}
@@ -306,7 +371,11 @@ export const TweetVideoStudio: React.FC = () => {
                 className="font-sans text-sm"
                 style={{ color: BRAND.colors.grey500 }}
               >
-                Paste a tweet URL to start
+                {preparingMedia
+                  ? "Preparing media…"
+                  : tweet
+                    ? "Preparing media…"
+                    : "Paste a tweet URL to start"}
               </p>
             </div>
           )}
@@ -322,7 +391,7 @@ export const TweetVideoStudio: React.FC = () => {
         >
           <Button
             onClick={handleDownload}
-            disabled={!tweet || isRendering || canExport === false}
+            disabled={!preparedTweet || isRendering || canExport === false}
             className="w-full font-sans"
           >
             {isRendering
