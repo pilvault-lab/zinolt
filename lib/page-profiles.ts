@@ -14,41 +14,42 @@ export interface PageProfile {
   defaultShowVerifiedBadge: boolean;
 }
 
+// Shared defaults — both pages start with identical controls so a profile
+// switch is purely an identity change.
+const SHARED_DEFAULTS = {
+  defaultTheme: "dark" as const,
+  defaultBackground: {
+    kind: "gradient" as const,
+    angle: 135,
+    from: "#0f172a",
+    to: "#1e293b",
+  },
+  defaultAspect: "9x16" as const,
+  defaultShowStats: false,
+  defaultShowTimestamp: true,
+  defaultShowVerifiedBadge: true,
+};
+
 export const PAGE_PROFILES: readonly PageProfile[] = [
   {
-    id: "general",
-    displayName: "General Page",
-    handle: "general_page",
-    avatarUrl: "/pages/general/avatar.jpg",
-    verified: false,
-    defaultTheme: "dark",
-    defaultBackground: {
-      kind: "gradient",
-      angle: 135,
-      from: "#0f172a",
-      to: "#1e293b",
-    },
-    defaultAspect: "9x16",
-    defaultShowStats: false,
-    defaultShowTimestamp: true,
-    defaultShowVerifiedBadge: false,
+    id: "zincad",
+    displayName: "Zincad",
+    handle: "zincad",
+    avatarUrl: "/pages/zincad/avatar.jpg",
+    verified: true,
+    ...SHARED_DEFAULTS,
   },
   {
-    id: "fintech",
-    displayName: "Fintech Page",
-    handle: "fintech_page",
-    avatarUrl: "/pages/fintech/avatar.jpg",
+    id: "vernavle",
+    displayName: "Vernavle",
+    handle: "vernavle",
+    avatarUrl: "/pages/vernavle/avatar.jpg",
     verified: true,
-    defaultTheme: "light",
-    defaultBackground: { kind: "solid", color: "#f8fafc" },
-    defaultAspect: "9x16",
-    defaultShowStats: false,
-    defaultShowTimestamp: true,
-    defaultShowVerifiedBadge: true,
+    ...SHARED_DEFAULTS,
   },
 ] as const;
 
-export const DEFAULT_PROFILE_ID = "general";
+export const DEFAULT_PROFILE_ID = "zincad";
 
 export const getProfile = (id: string): PageProfile =>
   PAGE_PROFILES.find((p) => p.id === id) ?? PAGE_PROFILES[0];
