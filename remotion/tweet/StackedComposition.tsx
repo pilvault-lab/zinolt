@@ -72,7 +72,7 @@ export type StackedProps = {
   showTimestamp: boolean;
   showVerifiedBadge: boolean;
   fontScale: number;
-  captionScale: number;
+  cardScale: number;
   muted: boolean;
   forRender: boolean;
 };
@@ -99,7 +99,7 @@ export const stackedDefaultProps: StackedProps = {
   showTimestamp: false,
   showVerifiedBadge: false,
   fontScale: 1,
-  captionScale: 1,
+  cardScale: 1,
   muted: false,
   forRender: false,
 };
@@ -116,7 +116,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
   background,
   showVerifiedBadge,
   fontScale,
-  captionScale,
+  cardScale,
   muted,
   forRender,
 }) => {
@@ -134,11 +134,11 @@ export const StackedComposition: React.FC<StackedProps> = ({
   const captionBottomPad = CAPTION_BOTTOM_PAD[aspect];
   const videoBottomPad = VIDEO_BOTTOM_PAD[aspect];
 
-  // Caption text block width — scale with captionScale, but never wider than
+  // Caption text block width — scale with cardScale, but never wider than
   // the padded slot.
   const captionWidthBase =
     aspect === "16x9" ? 1000 : aspect === "1x1" ? 900 : 900;
-  const captionWidth = Math.round(captionWidthBase * captionScale);
+  const captionWidth = Math.round(captionWidthBase * cardScale);
 
   return (
     <AbsoluteFill>
@@ -199,7 +199,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
             showVerifiedBadge={showVerifiedBadge}
             widthPx={captionWidth}
             fontScale={fontScale}
-            captionScale={captionScale}
+            cardScale={cardScale}
           />
         </div>
 

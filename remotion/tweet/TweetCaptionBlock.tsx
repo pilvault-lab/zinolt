@@ -45,7 +45,7 @@ export type TweetCaptionBlockProps = {
   showVerifiedBadge: boolean;
   widthPx: number;
   fontScale: number;
-  captionScale: number;
+  cardScale: number;
 };
 
 export const TweetCaptionBlock: React.FC<TweetCaptionBlockProps> = ({
@@ -55,7 +55,7 @@ export const TweetCaptionBlock: React.FC<TweetCaptionBlockProps> = ({
   showVerifiedBadge,
   widthPx,
   fontScale,
-  captionScale,
+  cardScale,
 }) => {
   const ink = theme === "dark" ? "#FFFFFF" : "#0A0A0A";
   const muted =
@@ -68,10 +68,10 @@ export const TweetCaptionBlock: React.FC<TweetCaptionBlockProps> = ({
       : "0 1px 6px rgba(255,255,255,0.4)";
 
   const baseSize = bucketCaptionSize(tweet.text.length);
-  const textSize = Math.round(baseSize * fontScale * captionScale);
-  const avatarSize = Math.round(64 * captionScale);
-  const nameSize = Math.round(26 * captionScale);
-  const handleSize = Math.round(20 * captionScale);
+  const textSize = Math.round(baseSize * fontScale * cardScale);
+  const avatarSize = Math.round(64 * cardScale);
+  const nameSize = Math.round(26 * cardScale);
+  const handleSize = Math.round(20 * cardScale);
 
   return (
     <div
@@ -88,7 +88,7 @@ export const TweetCaptionBlock: React.FC<TweetCaptionBlockProps> = ({
           display: "flex",
           gap: 14,
           alignItems: "center",
-          marginBottom: Math.round(20 * captionScale),
+          marginBottom: Math.round(20 * cardScale),
         }}
       >
         {identity.avatarUrl ? (

@@ -98,6 +98,7 @@ export const TweetVideoStudio: React.FC = () => {
   const [bgDirty, setBgDirty] = useState(false);
   const bgUploadUrlRef = useRef<string | null>(null);
   const [fontScale, setFontScale] = useState(1);
+  const [cardScale, setCardScale] = useState(1);
   const [durationSec, setDurationSec] = useState(7);
 
   const initialProfile = getProfile(DEFAULT_PROFILE_ID);
@@ -322,6 +323,7 @@ export const TweetVideoStudio: React.FC = () => {
       showTimestamp,
       showVerifiedBadge,
       fontScale,
+      cardScale,
       centerY: 0.5,
       forRender: false,
     }),
@@ -331,6 +333,7 @@ export const TweetVideoStudio: React.FC = () => {
       profile,
       bg,
       fontScale,
+      cardScale,
       theme,
       showStats,
       showTimestamp,
@@ -354,7 +357,7 @@ export const TweetVideoStudio: React.FC = () => {
       showTimestamp: false,
       showVerifiedBadge,
       fontScale,
-      captionScale: 1,
+      cardScale,
       muted,
       forRender: false,
     }),
@@ -365,6 +368,7 @@ export const TweetVideoStudio: React.FC = () => {
       muted,
       bg,
       fontScale,
+      cardScale,
       theme,
       showStats,
       showVerifiedBadge,
@@ -771,6 +775,32 @@ export const TweetVideoStudio: React.FC = () => {
                     className="font-sans text-xs"
                   />
                 ) : null}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between">
+                  <label
+                    className="font-sans text-xs uppercase tracking-wide"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    Card size
+                  </label>
+                  <span
+                    className="font-sans text-[11px] tabular-nums"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    {Math.round(cardScale * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.6}
+                  max={1.4}
+                  step={0.05}
+                  value={cardScale}
+                  onChange={(e) => setCardScale(Number(e.target.value))}
+                  style={{ accentColor: BRAND.colors.ink }}
+                />
               </div>
 
               <div className="flex flex-col gap-2">

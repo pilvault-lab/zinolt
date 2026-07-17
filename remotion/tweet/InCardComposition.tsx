@@ -75,6 +75,7 @@ export type InCardProps = {
   showTimestamp: boolean;
   showVerifiedBadge: boolean;
   fontScale: number;
+  cardScale: number;
   centerY: number;
   forRender: boolean;
 };
@@ -106,6 +107,7 @@ export const inCardDefaultProps: InCardProps = {
   showTimestamp: true,
   showVerifiedBadge: false,
   fontScale: 1,
+  cardScale: 1,
   centerY: 0.5,
   forRender: false,
 };
@@ -120,6 +122,7 @@ export const InCardComposition: React.FC<InCardProps> = ({
   showTimestamp,
   showVerifiedBadge,
   fontScale,
+  cardScale,
   centerY,
   forRender,
 }) => {
@@ -155,7 +158,8 @@ export const InCardComposition: React.FC<InCardProps> = ({
             maxWidth: CARD_MAX_WIDTH[aspect],
             position: "relative",
             top: `${(centerY - 0.5) * 100}%`,
-            transform: `translateY(${translate}px)`,
+            transform: `translateY(${translate}px) scale(${cardScale})`,
+            transformOrigin: "center center",
             opacity,
           }}
         >
