@@ -38,8 +38,22 @@ import {
   stackedDefaultProps,
   type StackedProps,
 } from "@/remotion/tweet/StackedComposition";
-import type { Aspect } from "@/remotion/tweet/types";
+import type { Aspect, BackgroundConfig } from "@/remotion/tweet/types";
 import { Header } from "../../_components/Header";
+
+const LOOP_LIBRARY: Array<{ id: string; label: string; src: string }> = [
+  { id: "light-ray-white", label: "Light Ray", src: "/rays/light-ray-white.mp4" },
+  {
+    id: "ferrofluid-white",
+    label: "Ferrofluid",
+    src: "/rays/ferrofluid-white.mp4",
+  },
+  {
+    id: "light-pillar",
+    label: "Light Pillar",
+    src: "/rays/light-pillar-white-v3.mp4",
+  },
+];
 
 const COMP_FPS = 30;
 const COMP_DURATION_FRAMES = COMP_FPS * 7;
@@ -74,6 +88,11 @@ export const TweetVideoStudio: React.FC = () => {
   const [layout, setLayout] = useState<"incard" | "stacked">("incard");
   const [layoutDirty, setLayoutDirty] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [bg, setBg] = useState<BackgroundConfig>(
+    getProfile(DEFAULT_PROFILE_ID).defaultBackground,
+  );
+  const [bgDirty, setBgDirty] = useState(false);
+  const bgUploadUrlRef = useRef<string | null>(null);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -148,6 +167,57 @@ export const TweetVideoStudio: React.FC = () => {
   }, [preparedTweet, layoutDirty]);
 
   useEffect(() => {
+    if (!bgDirty) setBg(profile.defaultBackground);
+  }, [profile, bgDirty]);
+
+  const onBgKindChange = useCallback(
+    (kind: BackgroundConfig["kind"]) => {
+      setBgDirty(true);
+      if (kind === "solid") setBg({ kind: "solid", color: "#0f172a" });
+      else if (kind === "gradient")
+        setBg({
+          kind: "gradient",
+          angle: 135,
+          from: "#0f172a",
+          to: "#1e293b",
+        });
+      else if (kind === "loop")
+        setBg({ kind: "loop", src: LOOP_LIBRARY[0].src });
+      else setBg({ kind: "upload", src: "" });
+    },
+    [],
+  );
+
+  const onBgUpload = useCallback(async (file: File) => {
+    if (bgUploadUrlRef.current) {
+      if (bgUploadUrlRef.current.startsWith("/__local-video/")) {
+        await deleteLocalVideo(bgUploadUrlRef.current);
+      } else {
+        URL.revokeObjectURL(bgUploadUrlRef.current);
+      }
+    }
+    let src: string;
+    if (file.type.startsWith("video/")) {
+      src = await storeLocalVideo(file);
+    } else {
+      src = URL.createObjectURL(file);
+    }
+    bgUploadUrlRef.current = src;
+    setBg({ kind: "upload", src });
+    setBgDirty(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (bgUploadUrlRef.current?.startsWith("/__local-video/")) {
+        void deleteLocalVideo(bgUploadUrlRef.current);
+      } else if (bgUploadUrlRef.current) {
+        URL.revokeObjectURL(bgUploadUrlRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const dims = ASPECT_DIMS[aspect];
     canRenderMediaOnWeb({
@@ -213,7 +283,7 @@ export const TweetVideoStudio: React.FC = () => {
         verified: profile.verified,
       },
       theme: profile.defaultTheme,
-      background: profile.defaultBackground,
+      background: bg,
       showStats: profile.defaultShowStats,
       showTimestamp: profile.defaultShowTimestamp,
       showVerifiedBadge: profile.defaultShowVerifiedBadge,
@@ -221,7 +291,7 @@ export const TweetVideoStudio: React.FC = () => {
       centerY: 0.5,
       forRender: false,
     }),
-    [aspect, preparedTweet, profile],
+    [aspect, preparedTweet, profile, bg],
   );
 
   const stackedInputProps = useMemo<StackedProps>(
@@ -235,7 +305,7 @@ export const TweetVideoStudio: React.FC = () => {
         verified: profile.verified,
       },
       theme: profile.defaultTheme,
-      background: profile.defaultBackground,
+      background: bg,
       showStats: profile.defaultShowStats,
       showTimestamp: false,
       showVerifiedBadge: profile.defaultShowVerifiedBadge,
@@ -243,7 +313,7 @@ export const TweetVideoStudio: React.FC = () => {
       muted,
       forRender: false,
     }),
-    [aspect, preparedTweet, profile, muted],
+    [aspect, preparedTweet, profile, muted, bg],
   );
 
   const currentComponent =
@@ -461,6 +531,110 @@ export const TweetVideoStudio: React.FC = () => {
                   Mute video audio
                 </label>
               ) : null}
+
+              <div className="flex flex-col gap-3">
+                <label
+                  className="font-sans text-xs uppercase tracking-wide"
+                  style={{ color: BRAND.colors.grey500 }}
+                >
+                  Background
+                </label>
+                <Select
+                  value={bg.kind}
+                  onValueChange={(v) =>
+                    onBgKindChange(v as BackgroundConfig["kind"])
+                  }
+                >
+                  <SelectTrigger className="w-full font-sans">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="solid">Solid</SelectItem>
+                    <SelectItem value="gradient">Gradient</SelectItem>
+                    <SelectItem value="loop">Loop</SelectItem>
+                    <SelectItem value="upload">Upload</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {bg.kind === "solid" ? (
+                  <input
+                    type="color"
+                    value={bg.color}
+                    onChange={(e) => {
+                      setBg({ kind: "solid", color: e.target.value });
+                      setBgDirty(true);
+                    }}
+                  />
+                ) : null}
+
+                {bg.kind === "gradient" ? (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={360}
+                      step={1}
+                      value={bg.angle}
+                      onChange={(e) => {
+                        setBg({ ...bg, angle: Number(e.target.value) });
+                        setBgDirty(true);
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={bg.from}
+                        onChange={(e) => {
+                          setBg({ ...bg, from: e.target.value });
+                          setBgDirty(true);
+                        }}
+                      />
+                      <input
+                        type="color"
+                        value={bg.to}
+                        onChange={(e) => {
+                          setBg({ ...bg, to: e.target.value });
+                          setBgDirty(true);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {bg.kind === "loop" ? (
+                  <Select
+                    value={bg.src}
+                    onValueChange={(v) => {
+                      setBg({ kind: "loop", src: v });
+                      setBgDirty(true);
+                    }}
+                  >
+                    <SelectTrigger className="w-full font-sans">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LOOP_LIBRARY.map((l) => (
+                        <SelectItem key={l.id} value={l.src}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
+
+                {bg.kind === "upload" ? (
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void onBgUpload(f);
+                      e.target.value = "";
+                    }}
+                    className="font-sans text-xs"
+                  />
+                ) : null}
+              </div>
             </>
           ) : (
             <p className="text-xs" style={{ color: BRAND.colors.grey500 }}>
