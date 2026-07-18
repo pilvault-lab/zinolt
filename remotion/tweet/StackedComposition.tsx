@@ -234,13 +234,18 @@ export const StackedComposition: React.FC<StackedProps> = ({
           />
         </div>
 
-        {/* Video zone fills remaining space, centered within it. */}
+        {/* Video zone. To avoid depending on object-position (which the export
+            composer does not honor — it always centers the object-fit result),
+            we size the wrapper to the source video's actual aspect ratio and
+            use object-fit: fill. That way there is no leftover space inside
+            the canvas box that could be positioned differently across preview
+            and export. The wrapper is top-aligned in the remaining flex space. */}
         {video ? (
           <div
             style={{
               flex: 1,
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "center",
               minHeight: 0,
               overflow: "hidden",
@@ -249,10 +254,12 @@ export const StackedComposition: React.FC<StackedProps> = ({
             <div
               style={{
                 width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                aspectRatio:
+                  video.width && video.height
+                    ? `${video.width} / ${video.height}`
+                    : "16 / 9",
+                maxHeight: "100%",
+                borderRadius: 20,
                 overflow: "hidden",
               }}
             >
@@ -260,12 +267,10 @@ export const StackedComposition: React.FC<StackedProps> = ({
                 <MediaVideo
                   src={videoSrc}
                   muted={muted || isGif}
-                  objectFit="contain"
+                  objectFit="fill"
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectPosition: "top",
-                    borderRadius: 20,
                     display: "block",
                   }}
                 />
@@ -276,9 +281,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
-                    objectPosition: "top",
-                    borderRadius: 20,
+                    objectFit: "fill",
                     display: "block",
                   }}
                 />
