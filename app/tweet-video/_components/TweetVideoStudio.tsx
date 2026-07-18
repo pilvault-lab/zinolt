@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Player } from "@remotion/player";
 import {
   canRenderMediaOnWeb,
@@ -122,6 +123,12 @@ export const TweetVideoStudio: React.FC = () => {
   const [canExport, setCanExport] = useState<boolean | null>(null);
   const [exportError, setExportError] = useState("");
 
+  // Sourcing dashboard handoff. When /sourcing approves a row it redirects
+  // here with ?url=&profile=&queue_id= — auto-fetch, pre-select the profile,
+  // and hold the queue_id so we can mark it 'rendered' after export succeeds.
+  const searchParams = useSearchParams();
+  const [queueId, setQueueId] = useState<string | null>(null);
+
   const profile = useMemo(() => getProfile(profileId), [profileId]);
   const preparedSwUrlsRef = useRef<string[]>([]);
 
@@ -129,6 +136,36 @@ export const TweetVideoStudio: React.FC = () => {
     prepareLocalVideoSW();
     const id = setInterval(pingLocalVideoSW, 15_000);
     return () => clearInterval(id);
+  }, []);
+
+  // Apply /sourcing handoff params once on mount.
+  useEffect(() => {
+    if (!searchParams) return;
+    const urlParam = searchParams.get("url");
+    const profileParam = searchParams.get("profile");
+    const queueIdParam = searchParams.get("queue_id");
+
+    if (profileParam && PAGE_PROFILES.some((p) => p.id === profileParam)) {
+      setProfileId(profileParam);
+    }
+    if (queueIdParam) setQueueId(queueIdParam);
+    if (urlParam) {
+      setUrlInput(urlParam);
+      (async () => {
+        setFetching(true);
+        setFetchError("");
+        try {
+          const t = await fetchTweet(urlParam);
+          setTweet(t);
+        } catch (e) {
+          setFetchError((e as Error).message || "both_sources_failed");
+          setTweet(null);
+        } finally {
+          setFetching(false);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -429,6 +466,16 @@ export const TweetVideoStudio: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      // Sourcing handoff: mark the queue row 'rendered'. Failure here does
+      // not affect the user — the MP4 already downloaded.
+      if (queueId) {
+        fetch("/api/tweet-queue/mark-rendered", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ queue_id: queueId }),
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error(err);
       setExportError(
