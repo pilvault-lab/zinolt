@@ -47,12 +47,13 @@ const Background: React.FC<{
   const src = resolveSrc(bg.src);
   if (!src) return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ overflow: "hidden" }}>
       {forRender ? (
         <MediaVideo
           src={src}
           muted
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          objectFit="cover"
+          style={{ width: "100%", height: "100%" }}
         />
       ) : (
         <OffthreadVideo

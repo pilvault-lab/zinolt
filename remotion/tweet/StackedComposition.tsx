@@ -149,15 +149,15 @@ export const StackedComposition: React.FC<StackedProps> = ({
           the configured solid / gradient / (loop is treated as solid black for
           Stacked since the whole point is the tweet's own video). */}
       {video ? (
-        <AbsoluteFill>
+        <AbsoluteFill style={{ overflow: "hidden" }}>
           {forRender ? (
             <MediaVideo
               src={videoSrc}
               muted
+              objectFit="cover"
               style={{
                 width: "100%",
                 height: "100%",
-                objectFit: "cover",
                 filter: "blur(40px) brightness(0.55)",
               }}
             />
@@ -227,16 +227,17 @@ export const StackedComposition: React.FC<StackedProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                overflow: "hidden",
               }}
             >
               {forRender ? (
                 <MediaVideo
                   src={videoSrc}
                   muted={muted || isGif}
+                  objectFit="contain"
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
                     objectPosition: "top",
                     borderRadius: 20,
                     display: "block",

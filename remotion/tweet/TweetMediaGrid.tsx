@@ -32,16 +32,17 @@ export const TweetMediaGrid: React.FC<{
           width: "100%",
           aspectRatio: `${aspect}`,
           maxHeight: 500,
+          overflow: "hidden",
         }}
       >
         {forRender ? (
           <MediaVideo
             src={first.url}
             muted
+            objectFit="cover"
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
               display: "block",
             }}
           />
