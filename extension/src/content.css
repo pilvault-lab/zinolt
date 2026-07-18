@@ -1,0 +1,58 @@
+/* Send-to-Zinolt button. Monochrome so it stays out of the way of X's UI.
+   Wrapped in a holder so we can attach margin without touching X's flex row. */
+
+.zinolt-send-btn-holder {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.zinolt-send-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font: 600 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  color: rgba(113, 118, 123, 1);
+  background: transparent;
+  border: 1px solid rgba(113, 118, 123, 0.35);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.zinolt-send-btn:hover {
+  color: rgba(15, 20, 25, 1);
+  border-color: rgba(15, 20, 25, 0.6);
+  background: rgba(15, 20, 25, 0.06);
+}
+
+/* Dark mode (X toggles on the body). Match X's ink token. */
+@media (prefers-color-scheme: dark) {
+  .zinolt-send-btn:hover {
+    color: rgba(231, 233, 234, 1);
+    border-color: rgba(231, 233, 234, 0.6);
+    background: rgba(231, 233, 234, 0.08);
+  }
+}
+
+.zinolt-send-btn--sending {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.zinolt-send-btn--ok {
+  color: #17a34a;
+  border-color: #17a34a;
+  background: rgba(23, 163, 74, 0.08);
+}
+
+.zinolt-send-btn--err {
+  color: #d21c3e;
+  border-color: #d21c3e;
+  background: rgba(210, 28, 62, 0.08);
+}

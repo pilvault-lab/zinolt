@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Send to Zinolt",
+  "version": "0.1.0",
+  "description": "Capture tweets from x.com into the Zinolt sourcing queue.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://kwqbgetoiiikctkmzirx.supabase.co/*"
+  ],
+  "action": {
+    "default_title": "Send to Zinolt",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["src/config.js", "src/selectors.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
