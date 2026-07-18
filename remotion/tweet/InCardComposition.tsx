@@ -93,7 +93,7 @@ export const inCardDefaultProps: InCardProps = {
   identity: {
     name: "Zinolt",
     handle: "zinolt",
-    avatarUrl: "/pages/zincad/avatar.jpg",
+    avatarUrl: "/pages/general/avatar.jpg",
     verified: false,
   },
   theme: "dark",
