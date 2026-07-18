@@ -102,17 +102,30 @@
     }
     const pageTarget = stored.pageTarget || null;
 
-    const url = `${CFG.supabaseUrl}/rest/v1/tweet_queue?on_conflict=tweet_id`;
+    // SECURITY DEFINER RPC: the function reads x-zinolt-secret from the
+    // request header, verifies it, then upserts on tweet_id conflict.
+    // Direct table writes are blocked by RLS.
+    const url = `${CFG.supabaseUrl}/rest/v1/rpc/capture_tweet`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
         apikey: CFG.supabaseAnonKey,
         Authorization: `Bearer ${CFG.supabaseAnonKey}`,
         "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal",
         "x-zinolt-secret": secret,
       },
-      body: JSON.stringify({ ...row, page_target: pageTarget }),
+      body: JSON.stringify({
+        p_tweet_id:      row.tweet_id,
+        p_tweet_url:     row.tweet_url,
+        p_author_handle: row.author_handle,
+        p_likes:         row.likes,
+        p_views:         row.views,
+        p_has_media:     row.has_media,
+        p_media_type:    row.media_type,
+        p_text_preview:  row.text_preview,
+        p_page_target:   pageTarget,
+        p_source:        row.source,
+      }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
