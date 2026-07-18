@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   AbsoluteFill,
   OffthreadVideo,
+  continueRender,
+  delayRender,
   interpolate,
   staticFile,
   useCurrentFrame,
@@ -127,6 +129,30 @@ export const StackedComposition: React.FC<StackedProps> = ({
   const captionOpacity = interpolate(frame, [0, 10], [0, 1], {
     extrapolateRight: "clamp",
   });
+
+  // Block the first frame until document.fonts.ready resolves. Without this
+  // the export renderer may capture frames while a fallback font is still
+  // being swapped for the real face — text metrics differ from the Player
+  // preview (which re-renders after the swap) and the caption block ends up
+  // a different height, widening the gap to the video below.
+  const [fontHandle] = useState(() => delayRender("Waiting for fonts"));
+  useEffect(() => {
+    let cancelled = false;
+    if (typeof document === "undefined" || !document.fonts) {
+      continueRender(fontHandle);
+      return;
+    }
+    document.fonts.ready
+      .then(() => {
+        if (!cancelled) continueRender(fontHandle);
+      })
+      .catch(() => {
+        if (!cancelled) continueRender(fontHandle);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fontHandle]);
 
   const video = pickVideo(tweet.media);
   const videoSrc = video ? resolveSrc(video.url) : "";
