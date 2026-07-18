@@ -100,6 +100,7 @@ export const TweetVideoStudio: React.FC = () => {
   const bgUploadUrlRef = useRef<string | null>(null);
   const [fontScale, setFontScale] = useState(1);
   const [cardScale, setCardScale] = useState(1);
+  const [verticalOffsetPct, setVerticalOffsetPct] = useState(50);
   const [durationSec, setDurationSec] = useState(7);
 
   const initialProfile = getProfile(DEFAULT_PROFILE_ID);
@@ -361,7 +362,7 @@ export const TweetVideoStudio: React.FC = () => {
       showVerifiedBadge,
       fontScale,
       cardScale,
-      centerY: 0.5,
+      centerY: verticalOffsetPct / 100,
       forRender: false,
     }),
     [
@@ -371,6 +372,7 @@ export const TweetVideoStudio: React.FC = () => {
       bg,
       fontScale,
       cardScale,
+      verticalOffsetPct,
       theme,
       showStats,
       showTimestamp,
@@ -395,6 +397,7 @@ export const TweetVideoStudio: React.FC = () => {
       showVerifiedBadge,
       fontScale,
       cardScale,
+      verticalOffsetPct,
       muted,
       forRender: false,
     }),
@@ -406,6 +409,7 @@ export const TweetVideoStudio: React.FC = () => {
       bg,
       fontScale,
       cardScale,
+      verticalOffsetPct,
       theme,
       showStats,
       showVerifiedBadge,
@@ -433,6 +437,16 @@ export const TweetVideoStudio: React.FC = () => {
     setIsRendering(true);
     setProgress(0);
     try {
+      // Force Remotion's dimension resolver to take the calculated-metadata
+      // branch, which has explicit priority over the composition object's
+      // width/height. This closes off any path where the composition size
+      // could be inferred from source video dimensions or fall back to a
+      // 16:9 default. Preview <Player> and export MUST share dimensions.
+      const outW = compDims.w;
+      const outH = compDims.h;
+      console.info(
+        `[tweet-video export] aspect=${aspect} layout=${layout} dims=${outW}x${outH} comp=${currentCompId}`,
+      );
       const { getBlob } = await renderMediaOnWeb({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         composition: {
@@ -440,9 +454,15 @@ export const TweetVideoStudio: React.FC = () => {
           component: currentComponent,
           durationInFrames: durationFrames,
           fps: COMP_FPS,
-          width: compDims.w,
-          height: compDims.h,
+          width: outW,
+          height: outH,
           defaultProps: currentDefaultProps,
+          calculateMetadata: () => ({
+            width: outW,
+            height: outH,
+            durationInFrames: durationFrames,
+            fps: COMP_FPS,
+          }),
         } as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         inputProps: {
@@ -872,6 +892,34 @@ export const TweetVideoStudio: React.FC = () => {
                   step={0.05}
                   value={fontScale}
                   onChange={(e) => setFontScale(Number(e.target.value))}
+                  style={{ accentColor: BRAND.colors.ink }}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between">
+                  <label
+                    className="font-sans text-xs uppercase tracking-wide"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    Vertical position
+                  </label>
+                  <span
+                    className="font-sans text-[11px] tabular-nums"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    {verticalOffsetPct}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={verticalOffsetPct}
+                  onChange={(e) =>
+                    setVerticalOffsetPct(Number(e.target.value))
+                  }
                   style={{ accentColor: BRAND.colors.ink }}
                 />
               </div>

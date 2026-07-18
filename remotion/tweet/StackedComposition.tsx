@@ -73,6 +73,7 @@ export type StackedProps = {
   showVerifiedBadge: boolean;
   fontScale: number;
   cardScale: number;
+  verticalOffsetPct: number;
   muted: boolean;
   forRender: boolean;
 };
@@ -100,6 +101,7 @@ export const stackedDefaultProps: StackedProps = {
   showVerifiedBadge: false,
   fontScale: 1,
   cardScale: 1,
+  verticalOffsetPct: 50,
   muted: false,
   forRender: false,
 };
@@ -117,6 +119,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
   showVerifiedBadge,
   fontScale,
   cardScale,
+  verticalOffsetPct,
   muted,
   forRender,
 }) => {
@@ -177,7 +180,8 @@ export const StackedComposition: React.FC<StackedProps> = ({
 
       {/* Layer 2 — vertical stack: caption block up top (auto height), video
           zone below (fills remaining space). Two distinct zones that never
-          overlap. */}
+          overlap. verticalOffsetPct shifts the whole stack: 50 = default,
+          0 = pushed to top, 100 = pushed to bottom. */}
       <AbsoluteFill
         style={{
           display: "flex",
@@ -188,6 +192,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
           paddingLeft: captionHPad,
           paddingRight: captionHPad,
           paddingBottom: videoBottomPad,
+          transform: `translateY(${verticalOffsetPct - 50}%)`,
         }}
       >
         {/* Caption — chromeless. No card container, no fill, no border. */}
