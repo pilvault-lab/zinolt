@@ -31,9 +31,9 @@ const CAPTION_TOP_PAD: Record<Aspect, number> = {
 };
 
 const CAPTION_BOTTOM_PAD: Record<Aspect, number> = {
-  "9x16": 40,
-  "1x1": 32,
-  "16x9": 24,
+  "9x16": 12,
+  "1x1": 10,
+  "16x9": 8,
 };
 
 const VIDEO_BOTTOM_PAD: Record<Aspect, number> = {
@@ -232,6 +232,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
                     width: "100%",
                     height: "100%",
                     objectFit: "contain",
+                    objectPosition: "top",
                     borderRadius: 20,
                     display: "block",
                   }}
@@ -244,6 +245,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
                     width: "100%",
                     height: "100%",
                     objectFit: "contain",
+                    objectPosition: "top",
                     borderRadius: 20,
                     display: "block",
                   }}
