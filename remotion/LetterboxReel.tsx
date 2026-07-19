@@ -171,7 +171,8 @@ export const LetterboxReel: React.FC<LetterboxReelProps> = ({
                 playbackRate={speed}
                 muted
                 onError={onMediaVideoError}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                objectFit="contain"
+                style={{ width: "100%", height: "100%" }}
               />
             ) : (
               <OffthreadVideo
