@@ -428,8 +428,21 @@ export const TweetVideoStudio: React.FC = () => {
       : `TweetInCard${aspect}`;
 
   const compDims = ASPECT_DIMS[aspect];
-  const playerW = Math.min(PLAYER_MAX_W, compDims.w);
-  const playerH = (playerW * compDims.h) / compDims.w;
+
+  const [playerDims, setPlayerDims] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const update = () => {
+      const maxW = window.innerWidth < 768 ? window.innerWidth - 32 : PLAYER_MAX_W;
+      const w = Math.min(maxW, compDims.w);
+      setPlayerDims({ w, h: Math.round((w * compDims.h) / compDims.w) });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [compDims]);
+
+  const playerW = playerDims.w || Math.min(PLAYER_MAX_W, compDims.w);
+  const playerH = playerDims.h || Math.round((playerW * compDims.h) / compDims.w);
 
   const handleDownload = useCallback(async () => {
     if (!preparedTweet) return;
@@ -532,7 +545,7 @@ export const TweetVideoStudio: React.FC = () => {
       />
 
       <div
-        className="flex shrink-0 items-center gap-3 px-6 py-4"
+        className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-3 md:px-6 md:py-4"
         style={{ borderBottom: `1px solid ${BRAND.colors.grey200}` }}
       >
         <input
@@ -543,7 +556,7 @@ export const TweetVideoStudio: React.FC = () => {
             if (e.key === "Enter") void doFetch();
           }}
           placeholder="Paste a tweet URL (x.com/user/status/…)"
-          className="flex-1 rounded-md border px-3 py-2 font-sans text-sm"
+          className="min-w-0 flex-1 rounded-md border px-3 py-2 font-sans text-sm"
           style={{
             borderColor: BRAND.colors.grey200,
             backgroundColor: "#FFFFFF",
@@ -554,7 +567,7 @@ export const TweetVideoStudio: React.FC = () => {
           {fetching ? "Fetching…" : "Fetch"}
         </Button>
         <Select value={profileId} onValueChange={setProfileId}>
-          <SelectTrigger className="w-40 font-sans">
+          <SelectTrigger className="flex-1 font-sans md:w-40 md:flex-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -602,13 +615,12 @@ export const TweetVideoStudio: React.FC = () => {
         </div>
       ) : null}
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
         <aside
-          className="flex flex-col gap-6 overflow-y-auto p-6"
+          className="flex flex-col gap-6 overflow-y-auto p-6 border-b md:border-b-0 md:border-r md:w-[320px]"
           style={{
-            width: 320,
             backgroundColor: BRAND.colors.paper,
-            borderRight: `1px solid ${BRAND.colors.grey200}`,
+            borderColor: BRAND.colors.grey200,
           }}
         >
           {preparedTweet ? (
@@ -963,8 +975,8 @@ export const TweetVideoStudio: React.FC = () => {
         </aside>
 
         <main
-          className="flex flex-1 items-center justify-center"
-          style={{ backgroundColor: "#5A5A60", padding: 48 }}
+          className="flex flex-1 items-center justify-center p-4 md:p-12"
+          style={{ backgroundColor: "#5A5A60" }}
         >
           {preparedTweet ? (
             <Player
@@ -1004,11 +1016,10 @@ export const TweetVideoStudio: React.FC = () => {
         </main>
 
         <aside
-          className="flex flex-col p-6"
+          className="flex flex-col p-6 border-t md:border-t-0 md:border-l md:w-[260px]"
           style={{
-            width: 260,
             backgroundColor: BRAND.colors.paper,
-            borderLeft: `1px solid ${BRAND.colors.grey200}`,
+            borderColor: BRAND.colors.grey200,
           }}
         >
           <Button

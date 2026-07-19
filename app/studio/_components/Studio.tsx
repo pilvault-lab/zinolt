@@ -168,6 +168,22 @@ export const Studio: React.FC = () => {
   const clipInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<PlayerRef>(null);
 
+  // ── Responsive player dimensions ──────────────────────────────────────────
+  const [playerDims, setPlayerDims] = useState({ w: PLAYER_WIDTH, h: PLAYER_HEIGHT });
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth < 768) {
+        const w = Math.min(PLAYER_WIDTH, window.innerWidth - 32);
+        setPlayerDims({ w, h: Math.round((w * COMP_H) / COMP_W) });
+      } else {
+        setPlayerDims({ w: PLAYER_WIDTH, h: PLAYER_HEIGHT });
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
   // Eagerly register the local-video service worker so it's ready before the
   // first upload. (Letterbox only — the reel templates don't need it.)
   useEffect(() => {
@@ -526,15 +542,14 @@ export const Studio: React.FC = () => {
         }
       />
 
-      {/* Three panes */}
-      <div className="flex flex-1 min-h-0">
+      {/* Three panes — vertical on mobile, horizontal on desktop */}
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
         {/* LEFT */}
         <aside
-          className="flex flex-col gap-6 p-6"
+          className="flex flex-col gap-6 p-6 overflow-y-auto border-b md:overflow-visible md:w-[300px] md:border-b-0 md:border-r"
           style={{
-            width: 300,
             backgroundColor: BRAND.colors.paper,
-            borderRight: `1px solid ${BRAND.colors.grey200}`,
+            borderColor: BRAND.colors.grey200,
           }}
         >
           {/* ── Upload zone ── */}
@@ -1043,8 +1058,8 @@ export const Studio: React.FC = () => {
 
         {/* CENTER — Player */}
         <main
-          className="flex flex-1 items-center justify-center"
-          style={{ backgroundColor: "#5A5A60", padding: 48 }}
+          className="flex flex-1 items-center justify-center p-4 md:p-12"
+          style={{ backgroundColor: "#5A5A60" }}
         >
           {hasContent ? (
             <Player
@@ -1060,16 +1075,16 @@ export const Studio: React.FC = () => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               inputProps={inputProps as any}
               style={{
-                width: PLAYER_WIDTH,
-                height: PLAYER_HEIGHT,
+                width: playerDims.w,
+                height: playerDims.h,
               }}
             />
           ) : (
             <div
               className="flex items-center justify-center"
               style={{
-                width: PLAYER_WIDTH,
-                height: PLAYER_HEIGHT,
+                width: playerDims.w,
+                height: playerDims.h,
                 backgroundColor: "#000",
               }}
             >
@@ -1085,11 +1100,10 @@ export const Studio: React.FC = () => {
 
         {/* RIGHT — download */}
         <aside
-          className="flex flex-col p-6"
+          className="flex flex-col p-6 border-t md:border-t-0 md:border-l md:w-[260px]"
           style={{
-            width: 260,
             backgroundColor: BRAND.colors.paper,
-            borderLeft: `1px solid ${BRAND.colors.grey200}`,
+            borderColor: BRAND.colors.grey200,
           }}
         >
           <Button
