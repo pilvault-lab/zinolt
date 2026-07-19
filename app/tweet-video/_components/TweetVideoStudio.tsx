@@ -511,8 +511,9 @@ export const TweetVideoStudio: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
+      const msg = err instanceof Error ? err.message : String(err);
       setExportError(
-        "Couldn't export in this browser. Try Chrome or Edge on desktop.",
+        msg && !msg.includes("[object") ? msg : "Export failed. Try Chrome or Edge on desktop.",
       );
     } finally {
       setIsRendering(false);
