@@ -78,6 +78,7 @@ export type StackedProps = {
   verticalOffsetPct: number;
   muted: boolean;
   forRender: boolean;
+  blurredBg: boolean;
 };
 
 export const stackedDefaultProps: StackedProps = {
@@ -106,6 +107,7 @@ export const stackedDefaultProps: StackedProps = {
   verticalOffsetPct: 50,
   muted: false,
   forRender: false,
+  blurredBg: true,
 };
 
 function pickVideo(media: TweetMedia[]): TweetMedia | null {
@@ -124,6 +126,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
   verticalOffsetPct,
   muted,
   forRender,
+  blurredBg,
 }) => {
   const frame = useCurrentFrame();
   const captionOpacity = interpolate(frame, [0, 10], [0, 1], {
@@ -171,10 +174,8 @@ export const StackedComposition: React.FC<StackedProps> = ({
 
   return (
     <AbsoluteFill>
-      {/* Layer 1 — full-frame background: blurred video if we have one, else
-          the configured solid / gradient / (loop is treated as solid black for
-          Stacked since the whole point is the tweet's own video). */}
-      {video ? (
+      {/* Layer 1 — full-frame background */}
+      {video && blurredBg ? (
         <AbsoluteFill style={{ overflow: "hidden", filter: "blur(40px) brightness(0.55)" }}>
           {forRender ? (
             <MediaVideo
@@ -196,7 +197,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
           )}
         </AbsoluteFill>
       ) : (
-        <SolidOrGradient bg={background} />
+        <AbsoluteFill style={{ backgroundColor: "#000" }} />
       )}
 
       {/* Layer 2 — vertical stack: caption block up top (auto height), video

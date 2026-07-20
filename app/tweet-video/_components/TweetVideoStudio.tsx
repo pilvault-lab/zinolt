@@ -93,6 +93,7 @@ export const TweetVideoStudio: React.FC = () => {
   const [layout, setLayout] = useState<"incard" | "stacked">("incard");
   const [layoutDirty, setLayoutDirty] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [blurredBg, setBlurredBg] = useState(true);
   const [bg, setBg] = useState<BackgroundConfig>(
     getProfile(DEFAULT_PROFILE_ID).defaultBackground,
   );
@@ -400,12 +401,14 @@ export const TweetVideoStudio: React.FC = () => {
       verticalOffsetPct,
       muted,
       forRender: false,
+      blurredBg,
     }),
     [
       aspect,
       preparedTweet,
       profile,
       muted,
+      blurredBg,
       bg,
       fontScale,
       cardScale,
@@ -658,17 +661,32 @@ export const TweetVideoStudio: React.FC = () => {
               </div>
 
               {preparedTweet.media.some((m) => m.type === "video") ? (
-                <label
-                  className="flex items-center gap-2 font-sans text-sm"
-                  style={{ color: BRAND.colors.ink }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={muted}
-                    onChange={(e) => setMuted(e.target.checked)}
-                  />
-                  Mute video audio
-                </label>
+                <div className="flex flex-col gap-2">
+                  <label
+                    className="flex items-center gap-2 font-sans text-sm"
+                    style={{ color: BRAND.colors.ink }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={muted}
+                      onChange={(e) => setMuted(e.target.checked)}
+                    />
+                    Mute video audio
+                  </label>
+                  {layout === "stacked" ? (
+                    <label
+                      className="flex items-center gap-2 font-sans text-sm"
+                      style={{ color: BRAND.colors.ink }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={blurredBg}
+                        onChange={(e) => setBlurredBg(e.target.checked)}
+                      />
+                      Blurred video background
+                    </label>
+                  ) : null}
+                </div>
               ) : null}
 
               <div className="flex flex-col gap-2">
