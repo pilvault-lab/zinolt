@@ -492,10 +492,14 @@ export const Studio: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         inputProps: renderInputProps as any,
         licenseKey: "free-license",
+        videoCodec: "h264",
         // Letterbox showcases the user's clip — bias toward higher quality.
         // Reel templates are mostly graphics + photo art; 12 Mbps is plenty.
         videoBitrate: isLetterbox ? 16_000_000 : 12_000_000,
         hardwareAcceleration: "prefer-hardware",
+        mediaCacheSizeInBytes: 256 * 1024 * 1024,
+        keyframeIntervalInSeconds: 2,
+        delayRenderTimeoutInMilliseconds: 60_000,
         // Letterbox clips render muted (audio sped up 12× breaks mediabunny's
         // resampler), so attach audio only for reel templates with a track.
         ...(audioTrack

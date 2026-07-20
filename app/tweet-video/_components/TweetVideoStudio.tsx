@@ -486,8 +486,16 @@ export const TweetVideoStudio: React.FC = () => {
           forRender: true,
         } as any,
         licenseKey: "free-license",
+        videoCodec: "h264",
         videoBitrate: layout === "stacked" ? 16_000_000 : 12_000_000,
         hardwareAcceleration: "prefer-hardware",
+        // Stacked decodes the same video twice (blurred bg + main). A 256 MB
+        // mediabunny cache lets the second element reuse decoded frames instead
+        // of re-decoding them, roughly halving frame-decode time.
+        mediaCacheSizeInBytes: 256 * 1024 * 1024,
+        // Fewer keyframes = faster encoding. 2s GOP at 30fps = 60-frame intervals.
+        keyframeIntervalInSeconds: 2,
+        delayRenderTimeoutInMilliseconds: 60_000,
         ...(layout === "stacked" && !muted
           ? { audioBitrate: "high" as const }
           : { muted: true }),
