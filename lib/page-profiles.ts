@@ -43,7 +43,7 @@ export const PAGE_PROFILES: readonly PageProfile[] = [
     id: "vernavle",
     displayName: "Vernavle",
     handle: "vernavle",
-    avatarUrl: "/pages/vernavle/avatar.jpg",
+    avatarUrl: "/brand/jujui.jpg",
     verified: true,
     ...SHARED_DEFAULTS,
   },
