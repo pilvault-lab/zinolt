@@ -11,7 +11,12 @@ export type WireCategory =
   | "predictions"
   | "culture";
 
-export type WireSourceType = "rss" | "reddit" | "hn" | "polymarket";
+export type WireSourceType =
+  | "rss"
+  | "reddit"
+  | "hn"
+  | "polymarket"
+  | "kalshi";
 
 export type WireSource = {
   name: string;
@@ -185,6 +190,99 @@ export const WIRE_SOURCES: WireSource[] = [
     category: "predictions",
     type: "polymarket",
     url: "https://gamma-api.polymarket.com/markets?closed=false&order=volume24hr&ascending=false&limit=15",
+    enabled: true,
+  },
+
+  // ── Kalshi (regulated US prediction markets, public trade-api v2) ──────
+  // Hits the /events endpoint (not /markets) so we get event-level titles,
+  // categories, and nested market pricing. Sports + Entertainment are
+  // filtered out inside the fetcher.
+  {
+    name: "Kalshi",
+    category: "predictions",
+    type: "kalshi",
+    url: "https://api.elections.kalshi.com/trade-api/v2/events?status=open",
+    enabled: true,
+  },
+
+  // ── Extra RSS ──────────────────────────────────────────────────────────
+  // Markets / finance news
+  {
+    // Sherwood publishes their feed at /rss.xml (the pretty /feed URL 404s).
+    name: "Sherwood News",
+    category: "markets",
+    type: "rss",
+    url: "https://sherwood.news/rss.xml",
+    enabled: true,
+  },
+  {
+    // Matt Levine's daily Money Stuff column at Bloomberg Opinion. Bloomberg
+    // sometimes 403s anonymous UAs — verify script will flag if this is dead.
+    name: "Money Stuff (Matt Levine)",
+    category: "markets",
+    type: "rss",
+    url: "https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss",
+    enabled: true,
+  },
+
+  // Fintech / payments
+  {
+    // Ghost publication — /feed 404s, actual RSS is at /archive/rss/.
+    name: "Bits About Money",
+    category: "fintech",
+    type: "rss",
+    url: "https://www.bitsaboutmoney.com/archive/rss/",
+    enabled: true,
+  },
+
+  // Tech / infra / AI
+  {
+    name: "SemiAnalysis",
+    category: "tech",
+    type: "rss",
+    url: "https://semianalysis.com/feed/",
+    enabled: true,
+  },
+  {
+    // Stratechery's free posts (Weekly Article, occasional Interviews).
+    name: "Stratechery",
+    category: "tech",
+    type: "rss",
+    url: "https://stratechery.com/feed/",
+    enabled: true,
+  },
+  {
+    // Product Hunt has a public RSS at /feed listing top daily launches.
+    name: "Product Hunt",
+    category: "tech",
+    type: "rss",
+    url: "https://www.producthunt.com/feed",
+    enabled: true,
+  },
+  {
+    // Community mirror of GitHub Trending as an RSS feed (mshibanami has
+    // maintained this since ~2019). GitHub itself doesn't publish trending
+    // in a machine-readable format.
+    name: "GitHub Trending",
+    category: "tech",
+    type: "rss",
+    url: "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
+    enabled: true,
+  },
+
+  // Culture / macro-thought
+  {
+    name: "Marginal Revolution",
+    category: "culture",
+    type: "rss",
+    url: "https://marginalrevolution.com/feed",
+    enabled: true,
+  },
+  {
+    name: "Astral Codex Ten",
+    category: "culture",
+    type: "rss",
+    url: "https://www.astralcodexten.com/feed",
     enabled: true,
   },
 ];
