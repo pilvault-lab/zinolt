@@ -101,7 +101,7 @@ export const TweetVideoStudio: React.FC = () => {
   const bgUploadUrlRef = useRef<string | null>(null);
   const [fontScale, setFontScale] = useState(1);
   const [cardScale, setCardScale] = useState(1);
-  const [verticalOffsetPct, setVerticalOffsetPct] = useState(50);
+  const [verticalOffsetPct, setVerticalOffsetPct] = useState(65);
   const [durationSec, setDurationSec] = useState(7);
 
   const initialProfile = getProfile(DEFAULT_PROFILE_ID);
@@ -496,7 +496,11 @@ export const TweetVideoStudio: React.FC = () => {
         // Fewer keyframes = faster encoding. 2s GOP at 30fps = 60-frame intervals.
         keyframeIntervalInSeconds: 2,
         delayRenderTimeoutInMilliseconds: 60_000,
-        ...(layout === "stacked" && !muted
+        // Only try to include audio when there's actually a video track to
+        // pull it from — a photo-only tweet has nothing to encode audio from.
+        ...(layout === "stacked" &&
+        !muted &&
+        preparedTweet.media.some((m) => m.type === "video")
           ? { audioBitrate: "high" as const }
           : { muted: true }),
         onProgress: ({ progress: p }) => setProgress(p),
@@ -628,8 +632,10 @@ export const TweetVideoStudio: React.FC = () => {
       ) : null}
 
       <div className="flex flex-1 min-h-0 flex-col md:flex-row">
+        {/* Settings sidebar. On desktop it sits on the left; on mobile it drops
+            below the preview so users see the video first. */}
         <aside
-          className="flex flex-col gap-6 overflow-y-auto p-6 border-b md:border-b-0 md:border-r md:w-[320px]"
+          className="order-3 flex flex-col gap-6 overflow-y-auto p-6 border-t md:order-none md:border-t-0 md:border-r md:w-[320px]"
           style={{
             backgroundColor: BRAND.colors.paper,
             borderColor: BRAND.colors.grey200,
@@ -668,19 +674,23 @@ export const TweetVideoStudio: React.FC = () => {
                 </div>
               </div>
 
-              {preparedTweet.media.some((m) => m.type === "video") ? (
+              {preparedTweet.media.some((m) => m.type === "video") ||
+              (layout === "stacked" &&
+                preparedTweet.media.some((m) => m.type === "photo")) ? (
                 <div className="flex flex-col gap-2">
-                  <label
-                    className="flex items-center gap-2 font-sans text-sm"
-                    style={{ color: BRAND.colors.ink }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={muted}
-                      onChange={(e) => setMuted(e.target.checked)}
-                    />
-                    Mute video audio
-                  </label>
+                  {preparedTweet.media.some((m) => m.type === "video") ? (
+                    <label
+                      className="flex items-center gap-2 font-sans text-sm"
+                      style={{ color: BRAND.colors.ink }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={muted}
+                        onChange={(e) => setMuted(e.target.checked)}
+                      />
+                      Mute video audio
+                    </label>
+                  ) : null}
                   {layout === "stacked" ? (
                     <label
                       className="flex items-center gap-2 font-sans text-sm"
@@ -691,7 +701,7 @@ export const TweetVideoStudio: React.FC = () => {
                         checked={blurredBg}
                         onChange={(e) => setBlurredBg(e.target.checked)}
                       />
-                      Blurred video background
+                      Blurred background
                     </label>
                   ) : null}
                 </div>
@@ -1002,7 +1012,7 @@ export const TweetVideoStudio: React.FC = () => {
         </aside>
 
         <main
-          className="flex flex-1 items-center justify-center p-4 md:p-12"
+          className="order-1 flex flex-1 items-center justify-center p-4 md:order-none md:p-12"
           style={{ backgroundColor: "#5A5A60" }}
         >
           {preparedTweet ? (
@@ -1042,8 +1052,10 @@ export const TweetVideoStudio: React.FC = () => {
           )}
         </main>
 
+        {/* Export sidebar — desktop right, mobile immediately under the
+            preview so download is one thumb-tap away. */}
         <aside
-          className="flex flex-col p-6 border-t md:border-t-0 md:border-l md:w-[260px]"
+          className="order-2 flex flex-col p-4 border-t md:order-none md:border-t-0 md:border-l md:w-[260px] md:p-6"
           style={{
             backgroundColor: BRAND.colors.paper,
             borderColor: BRAND.colors.grey200,

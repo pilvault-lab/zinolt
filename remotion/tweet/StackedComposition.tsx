@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AbsoluteFill,
+  Img,
   OffthreadVideo,
   continueRender,
   delayRender,
@@ -114,6 +115,10 @@ function pickVideo(media: TweetMedia[]): TweetMedia | null {
   return media.find((m) => m.type === "video" || m.type === "gif") ?? null;
 }
 
+function pickPhoto(media: TweetMedia[]): TweetMedia | null {
+  return media.find((m) => m.type === "photo") ?? null;
+}
+
 export const StackedComposition: React.FC<StackedProps> = ({
   aspect,
   tweet,
@@ -160,6 +165,9 @@ export const StackedComposition: React.FC<StackedProps> = ({
   const video = pickVideo(tweet.media);
   const videoSrc = video ? resolveSrc(video.url) : "";
   const isGif = video?.type === "gif";
+  // Photo fallback: when the tweet has no video/gif but has photos, render the
+  // first photo below the caption using the same layout the video zone uses.
+  const photo = !video ? pickPhoto(tweet.media) : null;
 
   const captionHPad = CAPTION_HORIZ_PAD[aspect];
   const captionTopPad = CAPTION_TOP_PAD[aspect];
@@ -195,6 +203,20 @@ export const StackedComposition: React.FC<StackedProps> = ({
               }}
             />
           )}
+        </AbsoluteFill>
+      ) : photo && blurredBg ? (
+        <AbsoluteFill style={{ overflow: "hidden", filter: "blur(40px) brightness(0.55)" }}>
+          <Img
+            src={photo.url}
+            onError={() => {
+              /* swallow — the caption stack still renders */
+            }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
         </AbsoluteFill>
       ) : (
         <AbsoluteFill style={{ backgroundColor: "#000" }} />
@@ -282,6 +304,47 @@ export const StackedComposition: React.FC<StackedProps> = ({
                   }}
                 />
               )}
+            </div>
+          </div>
+        ) : photo ? (
+          // Photo zone — mirrors the video layout: full-width wrapper sized to
+          // the image's aspect ratio, contain so nothing gets cropped even if
+          // the reported dimensions are off. Top-aligned so caption→photo
+          // spacing stays consistent with the video branch.
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "center",
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                aspectRatio:
+                  photo.width && photo.height
+                    ? `${photo.width} / ${photo.height}`
+                    : "16 / 9",
+                maxHeight: "100%",
+                borderRadius: 20,
+                overflow: "hidden",
+              }}
+            >
+              <Img
+                src={photo.url}
+                onError={() => {
+                  /* swallow — missing image renders as empty box */
+                }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
             </div>
           </div>
         ) : (

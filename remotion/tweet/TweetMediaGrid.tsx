@@ -12,6 +12,17 @@ const boxStyle: React.CSSProperties = {
   backgroundColor: "#0f1419",
 };
 
+// Never let a single photo be cropped inside the card frame — the container
+// already sizes to the photo's aspect ratio, but if the aspect is missing (or
+// off by a hair from the natural ratio) `cover` would silently crop. `contain`
+// guarantees the whole image is visible in every case.
+const singlePhotoImgStyle: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+};
+
 export const TweetMediaGrid: React.FC<{
   media: TweetMedia[];
   forRender?: boolean;
@@ -82,12 +93,7 @@ export const TweetMediaGrid: React.FC<{
           onError={() => {
             /* swallow — missing tweet media renders as empty box */
           }}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
+          style={singlePhotoImgStyle}
         />
       </div>
     );
