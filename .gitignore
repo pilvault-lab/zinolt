@@ -44,6 +44,13 @@ next-env.d.ts
 /.claude/
 /.playwright-mcp/
 
+# Clip Studio workspace + rendered outputs (local dev box)
+/.clipstudio/
+/outputs/
+
+# The Wire — local SQLite store
+/.wire/
+
 # scratch screenshots
 /before-click.png
 /studio-after.png
