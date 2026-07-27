@@ -36,7 +36,7 @@ export default async function WirePage({
   const window: WireWindow = parseWindow(params.win);
   const text = (params.q ?? "").trim();
 
-  const rows: WireItemRow[] = listItems({
+  const rows: WireItemRow[] = await listItems({
     category,
     sinceHours: window === "3d" ? 72 : 24,
     text: text || undefined,

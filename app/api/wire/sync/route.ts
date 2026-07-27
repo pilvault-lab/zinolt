@@ -3,9 +3,11 @@ import { fetchSource } from "@/lib/wire/fetchers";
 import { WIRE_SOURCES } from "@/lib/wire/sources";
 import { cleanupOld, insertItems } from "@/lib/wire/db";
 
-// node:sqlite + rss-parser both require the full Node runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Vercel default is 10s on Hobby; fetching ~20 feeds in parallel can push
+// past that if a single source is slow. 60s covers the worst case.
+export const maxDuration = 60;
 
 type PerSource = {
   name: string;
@@ -21,7 +23,7 @@ export async function POST() {
     enabled.map(async (s): Promise<PerSource> => {
       try {
         const items = await fetchSource(s);
-        const inserted = insertItems(items);
+        const inserted = await insertItems(items);
         return { name: s.name, fetched: items.length, new: inserted };
       } catch (err) {
         return {
@@ -37,7 +39,7 @@ export async function POST() {
   // Best-effort cleanup — a failure here should not fail the sync.
   let deleted = 0;
   try {
-    deleted = cleanupOld(14);
+    deleted = await cleanupOld(14);
   } catch {
     // swallow — the store is still usable
   }

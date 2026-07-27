@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad_flag" }, { status: 400 });
   }
 
-  const current = getItem(id);
+  const current = await getItem(id);
   if (!current) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -39,6 +39,6 @@ export async function POST(req: NextRequest) {
         ? 1
         : 0;
 
-  setFlag(id, body.flag, next);
+  await setFlag(id, body.flag, next);
   return NextResponse.json({ id, flag: body.flag, value: next });
 }
