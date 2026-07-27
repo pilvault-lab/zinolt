@@ -11,12 +11,7 @@ export type WireCategory =
   | "predictions"
   | "culture";
 
-export type WireSourceType =
-  | "rss"
-  | "reddit"
-  | "hn"
-  | "polymarket"
-  | "kalshi";
+export type WireSourceType = "rss" | "reddit" | "hn" | "polymarket";
 
 export type WireSource = {
   name: string;
@@ -190,18 +185,6 @@ export const WIRE_SOURCES: WireSource[] = [
     category: "predictions",
     type: "polymarket",
     url: "https://gamma-api.polymarket.com/markets?closed=false&order=volume24hr&ascending=false&limit=15",
-    enabled: true,
-  },
-
-  // ── Kalshi (regulated US prediction markets, public trade-api v2) ──────
-  // Hits the /events endpoint (not /markets) so we get event-level titles,
-  // categories, and nested market pricing. Sports + Entertainment are
-  // filtered out inside the fetcher.
-  {
-    name: "Kalshi",
-    category: "predictions",
-    type: "kalshi",
-    url: "https://api.elections.kalshi.com/trade-api/v2/events?status=open",
     enabled: true,
   },
 
