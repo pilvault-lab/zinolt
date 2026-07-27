@@ -11,26 +11,42 @@ export const Header: React.FC<{ right?: React.ReactNode }> = ({ right }) => {
         height: 64,
       }}
     >
-      <Link
-        href="/"
-        className="flex items-center gap-(--ds-space-xs) no-underline"
-      >
-        <Image
-          src={BRAND.iconSrc}
-          alt=""
-          aria-hidden
-          width={26}
-          height={26}
-          priority
-          style={{ borderRadius: 6, display: "block" }}
-        />
-        <span
-          className="type-label-lg tracking-tight"
-          style={{ color: BRAND.colors.ink }}
+      <div className="flex items-center gap-(--ds-space-md)">
+        <Link
+          href="/"
+          className="flex items-center gap-(--ds-space-xs) no-underline"
         >
-          zinolt
-        </span>
-      </Link>
+          <Image
+            src={BRAND.iconSrc}
+            alt=""
+            aria-hidden
+            width={26}
+            height={26}
+            priority
+            style={{ borderRadius: 6, display: "block" }}
+          />
+          <span
+            className="type-label-lg tracking-tight"
+            style={{ color: BRAND.colors.ink }}
+          >
+            zinolt
+          </span>
+        </Link>
+        <nav className="flex items-center gap-(--ds-space-sm)">
+          <Link
+            href="/wire"
+            className="type-label-sm text-ds-on-surface-muted hover:text-ds-on-surface no-underline"
+          >
+            Wire
+          </Link>
+          <Link
+            href="/sourcing"
+            className="type-label-sm text-ds-on-surface-muted hover:text-ds-on-surface no-underline"
+          >
+            Sourcing
+          </Link>
+        </nav>
+      </div>
       {right}
     </header>
   );
