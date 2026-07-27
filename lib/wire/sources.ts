@@ -259,16 +259,6 @@ export const WIRE_SOURCES: WireSource[] = [
     url: "https://www.producthunt.com/feed",
     enabled: true,
   },
-  {
-    // Community mirror of GitHub Trending as an RSS feed (mshibanami has
-    // maintained this since ~2019). GitHub itself doesn't publish trending
-    // in a machine-readable format.
-    name: "GitHub Trending",
-    category: "tech",
-    type: "rss",
-    url: "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
-    enabled: true,
-  },
 
   // Culture / macro-thought
   {
