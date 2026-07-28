@@ -125,9 +125,12 @@ async function processFile(
   const outSeconds = inSeconds / SPEED;
 
   // Output canvas is always 9:16. Height matches the source's longer dimension
-  // (in the 9:16 sense) so we don't downscale portrait clips.
-  const outH = Math.max(srcH, Math.round((srcW * 16) / 9));
-  const outW = Math.round((outH * 9) / 16);
+  // (in the 9:16 sense) so we don't downscale portrait clips. H264 requires
+  // even dimensions, so force both to the nearest even number.
+  const rawH = Math.max(srcH, Math.round((srcW * 16) / 9));
+  const rawW = Math.round((rawH * 9) / 16);
+  const outH = rawH - (rawH % 2);
+  const outW = rawW - (rawW % 2);
 
   // Content box (chosen aspect), centered inside the 9:16 canvas.
   const boxAspect = ASPECTS[aspect];
