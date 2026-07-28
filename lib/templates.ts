@@ -40,6 +40,14 @@ export const ARCHIVED_TEMPLATES: readonly Template[] = [
     preview: "/lanyard/lanyard-preview.svg",
     href: "/slides",
   },
+  {
+    id: "wall",
+    compositionId: "WallSignage",
+    label: "Wall Signage",
+    background: "",
+    preview: "/wall/wall-preview.svg",
+    href: "/wall",
+  },
 ] as const;
 
 export const TEMPLATES: readonly Template[] = [
@@ -51,12 +59,12 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/letterbox-card-empty.png",
   },
   {
-    id: "wall",
-    compositionId: "WallSignage",
-    label: "Wall Signage",
+    id: "repurpose",
+    compositionId: "",
+    label: "Repurpose",
     background: "",
-    preview: "/wall/wall-preview.svg",
-    href: "/wall",
+    preview: "/repurpose/preview.svg",
+    href: "/repurpose",
   },
   {
     id: "frosted",

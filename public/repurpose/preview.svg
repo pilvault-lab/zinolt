@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1a1a"/>
+      <stop offset="1" stop-color="#050505"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="640" fill="url(#bg)"/>
+  <image href="/brand/vernavle-logo.png" x="132" y="28" width="96" height="22" preserveAspectRatio="xMidYMid meet" opacity="0.9"/>
+  <g fill="#fff" opacity="0.7" font-family="Inter, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <text x="180" y="332" font-size="18" font-weight="500" letter-spacing="0.5">Repurpose</text>
+    <text x="180" y="358" font-size="11" opacity="0.6" letter-spacing="0.8">WATERMARK · 1.05×</text>
+  </g>
+  <g stroke="#fff" stroke-opacity="0.15" stroke-width="1" fill="none">
+    <rect x="24" y="24" width="312" height="592" rx="16"/>
+  </g>
+</svg>
