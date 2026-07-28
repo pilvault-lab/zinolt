@@ -62,7 +62,7 @@ export type ReelSafeJobStatus =
 
 export type ReelSafeResult = {
   jobId: string;
-  /** URL served by /api/reel-safe/file — the finished MP4. */
+  /** Public Vercel Blob URL of the finished MP4. */
   outputUrl: string;
   /** Final MP4 duration, seconds. */
   duration: number;

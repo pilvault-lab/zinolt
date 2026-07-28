@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type {
@@ -17,7 +18,9 @@ const CORNERS: { value: WatermarkCorner; label: string }[] = [
   { value: "bottom-right", label: "Bottom-Right" },
 ];
 
-type Phase = "idle" | "submitting" | "polling" | "done" | "error";
+type Phase = "idle" | "uploading" | "submitting" | "polling" | "done" | "error";
+
+type UploadProgress = { name: string; loaded: number; total: number };
 
 export function ReelSafeForm() {
   const [source, setSource] = useState<File | null>(null);
@@ -27,6 +30,7 @@ export function ReelSafeForm() {
   const [speed, setSpeed] = useState(1.05);
 
   const [phase, setPhase] = useState<Phase>("idle");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<ReelSafeJobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +44,6 @@ export function ReelSafeForm() {
   }, []);
 
   const poll = useCallback(async (id: string) => {
-    // Iterative polling loop — avoids the self-reference issue that arises with
-    // recursive setTimeout(poll, …) inside useCallback. The loop exits when
-    // cancelled.current flips true (unmount OR reset by the user).
     cancelled.current = false;
     while (!cancelled.current) {
       try {
@@ -73,26 +74,60 @@ export function ReelSafeForm() {
     }
   }, []);
 
+  const uploadOne = useCallback(
+    async (file: File, kind: "main" | "broll" | "watermark") => {
+      // Track progress in a stable slot per filename so re-renders don't wipe
+      // it. Multiple files with the same name are rare here but harmless.
+      const key = `${kind}:${file.name}`;
+      setUploadProgress((prev) => {
+        if (prev.some((p) => p.name === key)) return prev;
+        return [...prev, { name: key, loaded: 0, total: file.size }];
+      });
+      const blob = await upload(`reel-safe/uploads/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/reel-safe/upload",
+        clientPayload: JSON.stringify({ kind }),
+        onUploadProgress: ({ loaded, total }) => {
+          setUploadProgress((prev) =>
+            prev.map((p) => (p.name === key ? { ...p, loaded, total } : p)),
+          );
+        },
+      });
+      return blob.url;
+    },
+    [],
+  );
+
   const onSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!source) return;
-    setPhase("submitting");
+    setPhase("uploading");
+    setUploadProgress([]);
     setError(null);
     setResult(null);
     setStatus(null);
 
-    const form = new FormData();
-    form.append("source", source);
-    for (const b of brolls) form.append("broll", b);
-    if (watermark) form.append("watermark", watermark);
-    form.append("corner", corner);
-    form.append("speed", String(speed));
-
     try {
-      const res = await fetch("/api/reel-safe", { method: "POST", body: form });
+      // Upload in parallel — Blob's client SDK handles chunking and retries.
+      const [sourceUrl, brollUrls, watermarkUrl] = await Promise.all([
+        uploadOne(source, "main"),
+        Promise.all(brolls.map((b) => uploadOne(b, "broll"))),
+        watermark ? uploadOne(watermark, "watermark") : Promise.resolve(null),
+      ]);
+
+      setPhase("submitting");
+      const res = await fetch("/api/reel-safe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl,
+          brollUrls,
+          watermarkUrl,
+          corner,
+          speed,
+        }),
+      });
       if (!res.ok) {
-        // Try JSON first (our own error shape), fall back to the raw text so
-        // Next-level errors (HTML pages) surface something useful too.
         const contentType = res.headers.get("content-type") ?? "";
         let detail = "";
         if (contentType.includes("application/json")) {
@@ -124,6 +159,7 @@ export function ReelSafeForm() {
     setResult(null);
     setError(null);
     setJobId(null);
+    setUploadProgress([]);
   };
 
   return (
@@ -138,8 +174,14 @@ export function ReelSafeForm() {
 
       {phase === "done" && result ? (
         <ResultPanel result={result} onReset={reset} />
-      ) : phase === "polling" || phase === "submitting" ? (
-        <ProgressPanel phase={phase} status={status} jobId={jobId} onReset={reset} />
+      ) : phase === "polling" || phase === "submitting" || phase === "uploading" ? (
+        <ProgressPanel
+          phase={phase}
+          status={status}
+          jobId={jobId}
+          uploads={uploadProgress}
+          onReset={reset}
+        />
       ) : (
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <Card padding="comfortable" className="flex flex-col gap-4">
@@ -148,7 +190,7 @@ export function ReelSafeForm() {
               accept="video/*"
               file={source}
               onChange={setSource}
-              hint="MP4, MOV, WebM up to 500 MB."
+              hint="MP4, MOV, WebM up to 2 GB. Uploads directly to storage."
               required
             />
             <FileField
@@ -157,7 +199,7 @@ export function ReelSafeForm() {
               multiple
               files={brolls}
               onMultiChange={setBrolls}
-              hint="Up to 10 clips, 100 MB each. Spliced between speech chunks."
+              hint="Up to 10 clips, 500 MB each. Spliced between speech chunks."
             />
             <FileField
               label="Watermark PNG (optional)"
@@ -284,20 +326,33 @@ function ProgressPanel(props: {
   phase: Phase;
   status: ReelSafeJobStatus | null;
   jobId: string | null;
+  uploads: UploadProgress[];
   onReset: () => void;
 }) {
-  const { status, phase, jobId, onReset } = props;
-  const pct = phase === "submitting" ? 0.02 : status ? status.progress : 0;
-  const note =
-    phase === "submitting"
-      ? "Uploading…"
-      : status && "note" in status && status.note
-        ? status.note
-        : status?.state ?? "Starting…";
+  const { status, phase, jobId, uploads, onReset } = props;
+
+  // While uploading, show aggregate byte progress across all files.
+  let pct = 0;
+  let note = "Starting…";
+  if (phase === "uploading") {
+    const total = uploads.reduce((s, u) => s + u.total, 0);
+    const loaded = uploads.reduce((s, u) => s + u.loaded, 0);
+    pct = total > 0 ? loaded / total : 0;
+    note = `Uploading ${uploads.length} file${uploads.length === 1 ? "" : "s"}…`;
+  } else if (phase === "submitting") {
+    pct = 0.01;
+    note = "Queueing render…";
+  } else if (status) {
+    pct = status.progress;
+    note = "note" in status && status.note ? status.note : status.state;
+  }
+
   return (
     <Card padding="comfortable" className="flex flex-col gap-4">
       <div>
-        <p className="text-sm font-medium">Processing</p>
+        <p className="text-sm font-medium">
+          {phase === "uploading" ? "Uploading" : "Processing"}
+        </p>
         <p className="mt-1 text-xs text-ds-on-surface-muted">
           {jobId ? <>Job {jobId.slice(0, 8)}… — </> : null}
           {note}
@@ -309,6 +364,18 @@ function ProgressPanel(props: {
           style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }}
         />
       </div>
+      {phase === "uploading" && uploads.length > 1 ? (
+        <ul className="flex flex-col gap-1 text-xs text-ds-on-surface-muted">
+          {uploads.map((u) => (
+            <li key={u.name} className="flex justify-between gap-4">
+              <span className="truncate">{u.name.split(":").slice(1).join(":")}</span>
+              <span className="tabular-nums">
+                {u.total > 0 ? `${Math.round((u.loaded / u.total) * 100)}%` : "…"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <button
         type="button"
         onClick={onReset}

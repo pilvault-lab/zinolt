@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The reel-safe submit route reads scripts/reel-safe-pipeline.mjs at runtime
+  // to ship into the Vercel Sandbox. Include it in the function trace so it's
+  // available on serverless — Next.js can't detect this dynamic fs.readFile.
+  outputFileTracingIncludes: {
+    "/api/reel-safe": ["./scripts/reel-safe-pipeline.mjs"],
+  },
   async headers() {
     return [
       {

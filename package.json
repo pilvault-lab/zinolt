@@ -20,6 +20,8 @@
     "@remotion/renderer": "^4.0.478",
     "@remotion/web-renderer": "4.0.478",
     "@supabase/supabase-js": "^2.110.7",
+    "@vercel/blob": "^2.6.1",
+    "@vercel/sandbox": "^2.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "html-to-image": "^1.11.13",
