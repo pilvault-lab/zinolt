@@ -180,10 +180,15 @@ async function processFile(
     const packetSink = new EncodedPacketSink(audioTrack);
     let first = true;
     for await (const packet of packetSink.packets()) {
-      const retimed = packet.clone({
-        timestamp: packet.timestamp / SPEED,
-        duration: packet.duration / SPEED,
-      });
+      const startTs = packet.timestamp / SPEED;
+      const endTs = startTs + packet.duration / SPEED;
+      // AAC priming produces negative-timestamped packets. Skip any that end
+      // at or before zero, and clamp the first partial one to 0 so the muxer
+      // sees a valid non-negative stream.
+      if (endTs <= 0) continue;
+      const ts = Math.max(0, startTs);
+      const dur = endTs - ts;
+      const retimed = packet.clone({ timestamp: ts, duration: dur });
       const meta = first && decoderConfig ? { decoderConfig } : undefined;
       first = false;
       await audioSource.add(retimed, meta);
