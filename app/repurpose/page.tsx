@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_FORMATS,
   BlobSource,
@@ -17,12 +17,26 @@ import {
 // ── Config ────────────────────────────────────────────────────────────────
 const SPEED = 1.05;
 const BITRATE_FLOOR = 8_000_000; // 8 Mbps
+// Watermark: top-right, small margins so social-app UI overlays can't clip it.
 const LOGO = {
   src: "/brand/vernavle-logo.png",
-  widthRatio: 0.12, // fraction of video width
-  topRatio: 0.02, // top margin as fraction of video height
+  widthRatio: 0.12, // fraction of output width
+  rightRatio: 0.03, // right margin as fraction of output width
+  topRatio: 0.04, // top margin as fraction of output height (a few % down)
   opacity: 0.9,
 };
+
+// Content aspect ratios (width / height) available inside the 9:16 output frame.
+// Source is scaled with "cover" fit inside the chosen box; the box is centered
+// vertically; black bars fill the remainder of the 9:16 canvas.
+const ASPECTS = {
+  "9:16": 9 / 16,
+  "1:1": 1,
+  "4:5": 4 / 5,
+  "16:9": 16 / 9,
+} as const;
+type AspectKey = keyof typeof ASPECTS;
+const ASPECT_KEYS: readonly AspectKey[] = ["9:16", "1:1", "4:5", "16:9"] as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 type JobState =
@@ -78,6 +92,7 @@ function loadLogo(): Promise<ImageBitmap> {
 // ── Core: process one file ───────────────────────────────────────────────
 async function processFile(
   file: File,
+  aspect: AspectKey,
   onProgress: (p: number) => void,
 ): Promise<{
   blob: Blob;
@@ -103,10 +118,33 @@ async function processFile(
 
   const audioTrack = await input.getPrimaryAudioTrack();
 
-  const displayWidth = await videoTrack.getDisplayWidth();
-  const displayHeight = await videoTrack.getDisplayHeight();
+  const srcW = await videoTrack.getDisplayWidth();
+  const srcH = await videoTrack.getDisplayHeight();
   const inSeconds = await videoTrack.computeDuration();
   const outSeconds = inSeconds / SPEED;
+
+  // Output canvas is always 9:16. Height matches the source's longer dimension
+  // (in the 9:16 sense) so we don't downscale portrait clips.
+  const outH = Math.max(srcH, Math.round((srcW * 16) / 9));
+  const outW = Math.round((outH * 9) / 16);
+
+  // Content box (chosen aspect), centered inside the 9:16 canvas.
+  const boxAspect = ASPECTS[aspect];
+  let boxW = outW;
+  let boxH = Math.round(outW / boxAspect);
+  if (boxH > outH) {
+    boxH = outH;
+    boxW = Math.round(outH * boxAspect);
+  }
+  const boxX = Math.round((outW - boxW) / 2);
+  const boxY = Math.round((outH - boxH) / 2);
+
+  // Cover-fit source inside the content box.
+  const coverScale = Math.max(boxW / srcW, boxH / srcH);
+  const drawW = srcW * coverScale;
+  const drawH = srcH * coverScale;
+  const drawX = boxX + (boxW - drawW) / 2;
+  const drawY = boxY + (boxH - drawH) / 2;
 
   // Source bitrate (video only), matched with a floor for quality preservation.
   const videoStats = await videoTrack.computePacketStats(200);
@@ -115,18 +153,16 @@ async function processFile(
     BITRATE_FLOOR,
   );
 
-  // Compose canvas at source display resolution.
-  const canvas = new OffscreenCanvas(displayWidth, displayHeight);
+  const canvas = new OffscreenCanvas(outW, outH);
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("2D canvas context unavailable");
 
   const logo = await loadLogo();
-  const logoW = Math.round(displayWidth * LOGO.widthRatio);
+  const logoW = Math.round(outW * LOGO.widthRatio);
   const logoH = Math.round((logo.height / logo.width) * logoW);
-  const logoX = Math.round((displayWidth - logoW) / 2);
-  const logoY = Math.round(displayHeight * LOGO.topRatio);
+  const logoX = outW - logoW - Math.round(outW * LOGO.rightRatio);
+  const logoY = Math.round(outH * LOGO.topRatio);
 
-  // Output.
   const output = new Output({
     format: new Mp4OutputFormat({ fastStart: "in-memory" }),
     target: new BufferTarget(),
@@ -135,6 +171,11 @@ async function processFile(
   const videoSource = new CanvasSource(canvas, {
     codec: "avc",
     bitrate: targetBitrate,
+    keyFrameInterval: 5,
+    onEncoderConfig: (cfg) => {
+      // Bias for throughput over latency-hiding — matters on long clips.
+      (cfg as VideoEncoderConfig).latencyMode = "realtime";
+    },
   });
   output.addVideoTrack(videoSource);
 
@@ -154,8 +195,16 @@ async function processFile(
   const videoPass = (async () => {
     for await (const sample of videoSink.samples()) {
       ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, displayWidth, displayHeight);
-      sample.drawWithFit(ctx, { fit: "fill" });
+      ctx.fillRect(0, 0, outW, outH);
+
+      // Clip to the content box so cover-scaled source doesn't spill out.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(boxX, boxY, boxW, boxH);
+      ctx.clip();
+      sample.draw(ctx, drawX, drawY, drawW, drawH);
+      ctx.restore();
+
       ctx.save();
       ctx.globalAlpha = LOGO.opacity;
       ctx.drawImage(logo, logoX, logoY, logoW, logoH);
@@ -211,8 +260,8 @@ async function processFile(
     elapsedMs: performance.now() - t0,
     inSeconds,
     outSeconds,
-    width: displayWidth,
-    height: displayHeight,
+    width: outW,
+    height: outH,
   };
 }
 
@@ -258,11 +307,17 @@ async function saveJob(job: Job) {
 export default function RepurposePage() {
   const [support, setSupport] = useState<{ ok: boolean; reason?: string } | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [aspect, setAspect] = useState<AspectKey>("9:16");
+  const aspectRef = useRef<AspectKey>("9:16");
   const runningRef = useRef(false);
 
   useEffect(() => {
     setSupport(checkSupport());
   }, []);
+
+  useEffect(() => {
+    aspectRef.current = aspect;
+  }, [aspect]);
 
   const updateJob = useCallback((id: string, patch: Partial<Job>) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
@@ -278,12 +333,12 @@ export default function RepurposePage() {
           next = prev.find((j) => j.state.kind === "queued");
           return prev;
         });
-        // wait a microtask for setJobs to settle
         await Promise.resolve();
         if (!next) break;
+        const asp = aspectRef.current;
         updateJob(next.id, { state: { kind: "processing", progress: 0 } });
         try {
-          const result = await processFile(next.file, (p) => {
+          const result = await processFile(next.file, asp, (p) => {
             updateJob(next!.id, { state: { kind: "processing", progress: p } });
           });
           updateJob(next.id, { state: { kind: "done", ...result } });
@@ -310,12 +365,16 @@ export default function RepurposePage() {
         state: { kind: "queued" as const },
       }));
       setJobs((prev) => [...prev, ...added]);
-      // kick the queue after state update
       queueMicrotask(() => {
         void runQueue();
       });
     },
     [runQueue],
+  );
+
+  const queuedCount = useMemo(
+    () => jobs.filter((j) => j.state.kind === "queued").length,
+    [jobs],
   );
 
   if (support === null) {
@@ -354,7 +413,7 @@ export default function RepurposePage() {
         </p>
       </header>
 
-      <section className="px-5 pt-4">
+      <section className="px-5 pt-4 space-y-3">
         <label
           className="block w-full rounded-2xl bg-white text-black text-center py-6 text-lg font-medium active:opacity-80 select-none cursor-pointer"
         >
@@ -370,7 +429,40 @@ export default function RepurposePage() {
             }}
           />
         </label>
-        <p className="text-white/40 text-xs mt-2 text-center">
+
+        <div>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-white/60 text-xs uppercase tracking-wider">
+              Aspect (in 9:16)
+            </span>
+            {queuedCount > 0 ? (
+              <span className="text-white/40 text-[11px]">
+                applies to {queuedCount} queued
+              </span>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {ASPECT_KEYS.map((k) => {
+              const active = aspect === k;
+              return (
+                <button
+                  key={k}
+                  onClick={() => setAspect(k)}
+                  className={
+                    "rounded-xl py-3 text-sm font-medium border transition-colors " +
+                    (active
+                      ? "bg-white text-black border-white"
+                      : "bg-white/5 text-white/80 border-white/10 active:bg-white/10")
+                  }
+                >
+                  {k}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <p className="text-white/40 text-xs text-center">
           Multiple OK · processed one at a time
         </p>
       </section>
