@@ -310,6 +310,10 @@ export default function RepurposePage() {
   const [aspect, setAspect] = useState<AspectKey>("9:16");
   const aspectRef = useRef<AspectKey>("9:16");
   const runningRef = useRef(false);
+  // Pending job ids waiting to be processed, in FIFO order. Lives in a ref
+  // (not state) so the queue loop reads a stable, mutation-safe source that
+  // isn't affected by React 19 strict-mode updater double-invocation.
+  const queueRef = useRef<Job[]>([]);
 
   useEffect(() => {
     setSupport(checkSupport());
@@ -327,19 +331,13 @@ export default function RepurposePage() {
     if (runningRef.current) return;
     runningRef.current = true;
     try {
-      while (true) {
-        let next: Job | undefined;
-        setJobs((prev) => {
-          next = prev.find((j) => j.state.kind === "queued");
-          return prev;
-        });
-        await Promise.resolve();
-        if (!next) break;
+      while (queueRef.current.length > 0) {
+        const next = queueRef.current.shift()!;
         const asp = aspectRef.current;
         updateJob(next.id, { state: { kind: "processing", progress: 0 } });
         try {
           const result = await processFile(next.file, asp, (p) => {
-            updateJob(next!.id, { state: { kind: "processing", progress: p } });
+            updateJob(next.id, { state: { kind: "processing", progress: p } });
           });
           updateJob(next.id, { state: { kind: "done", ...result } });
         } catch (err) {
@@ -364,6 +362,7 @@ export default function RepurposePage() {
         file: f,
         state: { kind: "queued" as const },
       }));
+      queueRef.current.push(...added);
       setJobs((prev) => [...prev, ...added]);
       queueMicrotask(() => {
         void runQueue();
