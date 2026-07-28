@@ -18,7 +18,7 @@ import {
 const SPEED = 1.05;
 const BITRATE_FLOOR = 8_000_000; // 8 Mbps
 const LOGO = {
-  src: "/brand/vernavle-logo.jpg",
+  src: "/brand/vernavle-logo.png",
   widthRatio: 0.12, // fraction of video width
   topRatio: 0.02, // top margin as fraction of video height
   opacity: 0.9,
