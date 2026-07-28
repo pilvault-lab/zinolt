@@ -49,7 +49,10 @@ const isAbsoluteUrl = (s: string) => /^(blob:|data:|https?:|file:|\/)/i.test(s);
 const resolveSrc = (p: string): string =>
   isAbsoluteUrl(p) ? p : staticFile(p);
 
-const SolidOrGradient: React.FC<{ bg: BackgroundConfig }> = ({ bg }) => {
+const Background: React.FC<{
+  bg: BackgroundConfig;
+  forRender: boolean;
+}> = ({ bg, forRender }) => {
   if (bg.kind === "solid") {
     return <AbsoluteFill style={{ backgroundColor: bg.color }} />;
   }
@@ -62,7 +65,26 @@ const SolidOrGradient: React.FC<{ bg: BackgroundConfig }> = ({ bg }) => {
       />
     );
   }
-  return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
+  const src = resolveSrc(bg.src);
+  if (!src) return <AbsoluteFill style={{ backgroundColor: "#000" }} />;
+  return (
+    <AbsoluteFill style={{ overflow: "hidden" }}>
+      {forRender ? (
+        <MediaVideo
+          src={src}
+          muted
+          objectFit="cover"
+          style={{ width: "100%", height: "100%" }}
+        />
+      ) : (
+        <OffthreadVideo
+          src={src}
+          muted
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
+    </AbsoluteFill>
+  );
 };
 
 export type StackedProps = {
@@ -182,7 +204,9 @@ export const StackedComposition: React.FC<StackedProps> = ({
 
   return (
     <AbsoluteFill>
-      {/* Layer 1 — full-frame background */}
+      {/* Layer 1 — full-frame background. When `blurredBg` is on, a blurred
+          copy of the media wins. Otherwise the user's chosen background config
+          (solid/gradient/loop/upload) renders. */}
       {video && blurredBg ? (
         <AbsoluteFill style={{ overflow: "hidden", filter: "blur(40px) brightness(0.55)" }}>
           {forRender ? (
@@ -219,7 +243,7 @@ export const StackedComposition: React.FC<StackedProps> = ({
           />
         </AbsoluteFill>
       ) : (
-        <AbsoluteFill style={{ backgroundColor: "#000" }} />
+        <Background bg={background} forRender={forRender} />
       )}
 
       {/* Layer 2 — vertical stack: caption block up top (auto height), video

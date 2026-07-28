@@ -103,6 +103,7 @@ export const TweetVideoStudio: React.FC = () => {
   const [cardScale, setCardScale] = useState(1);
   const [verticalOffsetPct, setVerticalOffsetPct] = useState(65);
   const [durationSec, setDurationSec] = useState(7);
+  const [durationDirty, setDurationDirty] = useState(false);
 
   const initialProfile = getProfile(DEFAULT_PROFILE_ID);
   const [theme, setTheme] = useState<CardTheme>(initialProfile.defaultTheme);
@@ -329,22 +330,26 @@ export const TweetVideoStudio: React.FC = () => {
     [urlInput],
   );
 
-  const durationFrames = useMemo(() => {
-    if (!preparedTweet) return COMP_DURATION_FRAMES;
+  // Seed durationSec from the media's natural length the first time a tweet
+  // loads, so the slider reflects reality. After the user touches the slider
+  // (durationDirty), respect their value even if a new tweet loads.
+  useEffect(() => {
+    if (!preparedTweet || durationDirty) return;
     const vid = preparedTweet.media.find(
       (m) => m.type === "video" || m.type === "gif",
     );
-    if (layout === "stacked" && vid?.durationMs) {
-      return Math.max(30, Math.ceil((vid.durationMs / 1000) * COMP_FPS));
-    }
-    if (layout === "incard" && vid?.durationMs) {
-      return Math.max(
-        30,
-        Math.ceil(((vid.durationMs + 1000) / 1000) * COMP_FPS),
+    if (vid?.durationMs) {
+      const tail = layout === "incard" ? 1 : 0;
+      setDurationSec(
+        Math.max(4, Math.round(vid.durationMs / 1000) + tail),
       );
     }
-    return Math.round(durationSec * COMP_FPS);
-  }, [preparedTweet, layout, durationSec]);
+  }, [preparedTweet, layout, durationDirty]);
+
+  const durationFrames = useMemo(
+    () => Math.max(30, Math.round(durationSec * COMP_FPS)),
+    [durationSec],
+  );
 
   const inCardInputProps = useMemo<InCardProps>(
     () => ({
@@ -973,36 +978,44 @@ export const TweetVideoStudio: React.FC = () => {
                 />
               </div>
 
-              {layout === "incard" &&
-              !preparedTweet.media.some(
-                (m) => m.type === "video" || m.type === "gif",
-              ) ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-baseline justify-between">
-                    <label
-                      className="font-sans text-xs uppercase tracking-wide"
-                      style={{ color: BRAND.colors.grey500 }}
-                    >
-                      Duration
-                    </label>
-                    <span
-                      className="font-sans text-[11px] tabular-nums"
-                      style={{ color: BRAND.colors.grey500 }}
-                    >
-                      {durationSec}s
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={4}
-                    max={15}
-                    step={1}
-                    value={durationSec}
-                    onChange={(e) => setDurationSec(Number(e.target.value))}
-                    style={{ accentColor: BRAND.colors.ink }}
-                  />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between">
+                  <label
+                    className="font-sans text-xs uppercase tracking-wide"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    Duration
+                  </label>
+                  <span
+                    className="font-sans text-[11px] tabular-nums"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    {durationSec}s
+                  </span>
                 </div>
-              ) : null}
+                <input
+                  type="range"
+                  min={4}
+                  max={60}
+                  step={1}
+                  value={durationSec}
+                  onChange={(e) => {
+                    setDurationSec(Number(e.target.value));
+                    setDurationDirty(true);
+                  }}
+                  style={{ accentColor: BRAND.colors.ink }}
+                />
+                {preparedTweet.media.some(
+                  (m) => m.type === "video" || m.type === "gif",
+                ) ? (
+                  <p
+                    className="font-sans text-[11px] leading-snug"
+                    style={{ color: BRAND.colors.grey500 }}
+                  >
+                    Extending past the video length holds on the last frame.
+                  </p>
+                ) : null}
+              </div>
             </>
           ) : (
             <p className="text-xs" style={{ color: BRAND.colors.grey500 }}>
