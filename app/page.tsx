@@ -28,12 +28,14 @@ export default function Home() {
           </p>
         </section>
 
-        {/* Template grid */}
-        <section className="grid w-full max-w-5xl grid-cols-1 gap-(--ds-space-md) md:min-h-0 md:flex-1 md:grid-cols-3 pb-(--ds-space-lg)">
+        {/* Template grid — 3×2 on desktop so the current 6 tiles all fit
+            inside the h-screen viewport without being clipped by
+            overflow-hidden. */}
+        <section className="grid w-full max-w-5xl grid-cols-1 gap-(--ds-space-md) md:min-h-0 md:flex-1 md:grid-cols-3 md:grid-rows-2 pb-(--ds-space-lg)">
           {TEMPLATES.map((t) => (
             <Card
               key={t.id}
-              className="flex flex-col gap-(--ds-space-sm) p-5 md:min-h-0 md:gap-(--ds-space-sm) md:p-4"
+              className="flex min-h-0 flex-col gap-(--ds-space-sm) p-5 md:min-h-0 md:gap-(--ds-space-sm) md:p-4"
             >
               <div className="flex flex-col items-center gap-(--ds-space-xs)">
                 <h2 className="type-headline-md">{t.label}</h2>
