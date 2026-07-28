@@ -44,6 +44,15 @@ function isTypingElement(el: EventTarget | null): boolean {
   );
 }
 
+function buildCarouselHref(row: WireItemRow): string {
+  const usp = new URLSearchParams();
+  usp.set("title", row.title);
+  if (row.category) usp.set("category", row.category);
+  if (row.snippet) usp.set("snippet", row.snippet);
+  usp.set("url", row.url);
+  return `/wire-carousel?${usp.toString()}`;
+}
+
 function buildHref(patch: Record<string, string | undefined>): string {
   const usp = new URLSearchParams();
   for (const [k, v] of Object.entries(patch)) {
@@ -375,6 +384,16 @@ const WireRow: React.FC<{
         </span>
         {row.score != null ? <span>{fmtScore(row.score)}</span> : null}
         <span>{fmtRelative(row.published_at)}</span>
+        <a
+          href={buildCarouselHref(row)}
+          target="_blank"
+          rel="noreferrer"
+          title="Create carousel"
+          onClick={(e) => e.stopPropagation()}
+          className="rounded border border-ds-border-hairline px-1.5 py-0.5 text-[10px] uppercase tracking-wide hover:bg-[rgba(10,10,10,0.06)]"
+        >
+          Carousel
+        </a>
         <button
           type="button"
           title={row.used ? "Mark unused" : "Mark used"}

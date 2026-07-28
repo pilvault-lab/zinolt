@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 337" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a4a5a" />
+      <stop offset="100%" stop-color="#0d1218" />
+    </linearGradient>
+    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)" />
+      <stop offset="60%" stop-color="rgba(0,0,0,0.55)" />
+      <stop offset="100%" stop-color="rgba(0,0,0,0.85)" />
+    </linearGradient>
+  </defs>
+
+  <rect width="270" height="337" fill="url(#bg)" />
+  <rect width="270" height="337" fill="url(#scrim)" />
+
+  <!-- Vernavle mark, top-left -->
+  <text x="18" y="30" font-family="Inter, sans-serif" font-size="10" letter-spacing="3" fill="rgba(255,255,255,0.85)">VERNAVLE</text>
+
+  <!-- Red tag -->
+  <rect x="18" y="220" width="66" height="18" rx="3" fill="#E11D2A" />
+  <text x="27" y="233" font-family="Impact, 'Arial Narrow Bold', sans-serif" font-size="10" letter-spacing="1.5" fill="#FFFFFF">BREAKING</text>
+
+  <!-- Huge headline -->
+  <text x="18" y="264" font-family="Impact, 'Arial Narrow Bold', sans-serif" font-size="26" letter-spacing="-0.5" fill="#FFFFFF">BIG NEWS</text>
+  <text x="18" y="288" font-family="Impact, 'Arial Narrow Bold', sans-serif" font-size="26" letter-spacing="-0.5" fill="#FFFFFF">HITS TAPE</text>
+  <text x="18" y="312" font-family="Impact, 'Arial Narrow Bold', sans-serif" font-size="26" letter-spacing="-0.5" fill="#FFFFFF">TODAY</text>
+</svg>

@@ -75,6 +75,14 @@ export const TEMPLATES: readonly Template[] = [
     href: "/frosted",
   },
   {
+    id: "wire-carousel",
+    compositionId: "",
+    label: "Wire Carousel",
+    background: "",
+    preview: "/wire-carousel/preview.svg",
+    href: "/wire-carousel",
+  },
+  {
     id: "dangle",
     compositionId: "Dangle",
     label: "Dangle Card",
