@@ -91,8 +91,21 @@ export function ReelSafeForm() {
     try {
       const res = await fetch("/api/reel-safe", { method: "POST", body: form });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
-        throw new Error(body.message ?? body.error ?? `Submit failed (${res.status})`);
+        // Try JSON first (our own error shape), fall back to the raw text so
+        // Next-level errors (HTML pages) surface something useful too.
+        const contentType = res.headers.get("content-type") ?? "";
+        let detail = "";
+        if (contentType.includes("application/json")) {
+          const body = (await res.json().catch(() => ({}))) as {
+            message?: string;
+            error?: string;
+          };
+          detail = body.message ?? body.error ?? "";
+        } else {
+          const text = await res.text().catch(() => "");
+          detail = text.trim().slice(0, 240);
+        }
+        throw new Error(detail || `Submit failed (${res.status} ${res.statusText || ""})`.trim());
       }
       const { jobId: id } = (await res.json()) as { jobId: string };
       setJobId(id);

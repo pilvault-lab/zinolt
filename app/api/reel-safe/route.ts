@@ -19,10 +19,16 @@ import { DEFAULT_CONFIG, type WatermarkCorner } from "@/lib/reelsafe-types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_MAIN_BYTES = 500 * 1024 * 1024; // 500 MB
-const MAX_BROLL_BYTES = 100 * 1024 * 1024; // 100 MB per clip
-const MAX_WATERMARK_BYTES = 5 * 1024 * 1024;
+const MAX_MAIN_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_BROLL_BYTES = 500 * 1024 * 1024; // 500 MB per clip
+const MAX_WATERMARK_BYTES = 25 * 1024 * 1024;
 const MAX_BROLLS = 10;
+
+function humanBytes(n: number): string {
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(0)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
 const CORNERS: readonly WatermarkCorner[] = [
   "top-left",
   "top-right",
@@ -50,10 +56,19 @@ export async function POST(req: NextRequest) {
 
   const source = form.get("source");
   if (!(source instanceof File) || source.size === 0) {
-    return NextResponse.json({ error: "missing_source" }, { status: 400 });
+    return NextResponse.json(
+      { error: "missing_source", message: "Pick a main video file to upload." },
+      { status: 400 },
+    );
   }
   if (source.size > MAX_MAIN_BYTES) {
-    return NextResponse.json({ error: "source_too_large" }, { status: 413 });
+    return NextResponse.json(
+      {
+        error: "source_too_large",
+        message: `Main video is ${humanBytes(source.size)}. Limit is ${humanBytes(MAX_MAIN_BYTES)}.`,
+      },
+      { status: 413 },
+    );
   }
 
   const brolls: File[] = [];
@@ -68,7 +83,13 @@ export async function POST(req: NextRequest) {
   }
   for (const b of brolls) {
     if (b.size > MAX_BROLL_BYTES) {
-      return NextResponse.json({ error: "broll_too_large" }, { status: 413 });
+      return NextResponse.json(
+        {
+          error: "broll_too_large",
+          message: `B-roll "${b.name}" is ${humanBytes(b.size)}. Limit is ${humanBytes(MAX_BROLL_BYTES)} per clip.`,
+        },
+        { status: 413 },
+      );
     }
   }
 
@@ -76,7 +97,13 @@ export async function POST(req: NextRequest) {
   let watermarkFile: File | null = null;
   if (watermark instanceof File && watermark.size > 0) {
     if (watermark.size > MAX_WATERMARK_BYTES) {
-      return NextResponse.json({ error: "watermark_too_large" }, { status: 413 });
+      return NextResponse.json(
+        {
+          error: "watermark_too_large",
+          message: `Watermark is ${humanBytes(watermark.size)}. Limit is ${humanBytes(MAX_WATERMARK_BYTES)}.`,
+        },
+        { status: 413 },
+      );
     }
     if (!/\.png$/i.test(watermark.name)) {
       // v1: PNG only. SVG rasterization needs an extra dep (sharp/rsvg) that
