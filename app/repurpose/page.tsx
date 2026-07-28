@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 import {
   ALL_FORMATS,
   BlobSource,
@@ -294,6 +295,42 @@ function saveJob(job: Job) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+async function saveAll(jobs: Job[]) {
+  const done = jobs.filter(
+    (j): j is Job & { state: Extract<JobState, { kind: "done" }> } =>
+      j.state.kind === "done",
+  );
+  if (done.length === 0) return;
+
+  const zip = new JSZip();
+  const used = new Set<string>();
+  for (const j of done) {
+    let name = j.state.outFile.name;
+    if (used.has(name)) {
+      const dot = name.lastIndexOf(".");
+      const base = dot > 0 ? name.slice(0, dot) : name;
+      const ext = dot > 0 ? name.slice(dot) : "";
+      let i = 2;
+      while (used.has(`${base} (${i})${ext}`)) i++;
+      name = `${base} (${i})${ext}`;
+    }
+    used.add(name);
+    zip.file(name, j.state.blob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Vernavle · ${done.length} clips.zip`;
+  a.rel = "noopener";
+  a.target = "_blank";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function RepurposePage() {
   const [support, setSupport] = useState<{ ok: boolean; reason?: string } | null>(null);
@@ -366,6 +403,20 @@ export default function RepurposePage() {
     () => jobs.filter((j) => j.state.kind === "queued").length,
     [jobs],
   );
+  const doneCount = useMemo(
+    () => jobs.filter((j) => j.state.kind === "done").length,
+    [jobs],
+  );
+  const [zipping, setZipping] = useState(false);
+  const onSaveAll = useCallback(async () => {
+    if (zipping) return;
+    setZipping(true);
+    try {
+      await saveAll(jobs);
+    } finally {
+      setZipping(false);
+    }
+  }, [jobs, zipping]);
 
   if (support === null) {
     return <main className="min-h-dvh bg-black" />;
@@ -451,6 +502,16 @@ export default function RepurposePage() {
             })}
           </div>
         </div>
+
+        {doneCount > 0 ? (
+          <button
+            onClick={onSaveAll}
+            disabled={zipping}
+            className="block w-full rounded-2xl bg-white/10 text-white text-center py-3 text-sm font-medium border border-white/15 active:opacity-80 disabled:opacity-50"
+          >
+            {zipping ? "Zipping…" : `Save all (${doneCount}) as .zip`}
+          </button>
+        ) : null}
 
         <p className="text-white/40 text-xs text-center">
           Multiple OK · processed one at a time
