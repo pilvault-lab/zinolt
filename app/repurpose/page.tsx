@@ -276,27 +276,18 @@ function fmtSec(s: number): string {
   return `${s.toFixed(2)}s`;
 }
 
-// ── Share / download ─────────────────────────────────────────────────────
-async function saveJob(job: Job) {
+// ── Download ─────────────────────────────────────────────────────────────
+function saveJob(job: Job) {
   if (job.state.kind !== "done") return;
   const { outFile, blob } = job.state;
-  const nav = navigator as Navigator & {
-    canShare?: (data: { files?: File[] }) => boolean;
-    share?: (data: { files?: File[]; title?: string }) => Promise<void>;
-  };
-  if (nav.canShare?.({ files: [outFile] }) && nav.share) {
-    try {
-      await nav.share({ files: [outFile], title: outFile.name });
-      return;
-    } catch (err) {
-      if ((err as DOMException)?.name === "AbortError") return;
-      // fall through to download
-    }
-  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = outFile.name;
+  a.rel = "noopener";
+  // iOS Safari needs the anchor to be in the DOM and clicked in the user
+  // gesture; some builds also honor target="_blank" better for blob downloads.
+  a.target = "_blank";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -473,7 +464,7 @@ export default function RepurposePage() {
           </div>
         ) : null}
         {jobs.map((job) => (
-          <JobRow key={job.id} job={job} onSave={() => void saveJob(job)} />
+          <JobRow key={job.id} job={job} onSave={() => saveJob(job)} />
         ))}
       </section>
     </main>
