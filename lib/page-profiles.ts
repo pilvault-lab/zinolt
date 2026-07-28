@@ -32,14 +32,6 @@ const SHARED_DEFAULTS = {
 
 export const PAGE_PROFILES: readonly PageProfile[] = [
   {
-    id: "zincad",
-    displayName: "Zincad",
-    handle: "zincad",
-    avatarUrl: "/pages/zincad/avatar.jpg",
-    verified: true,
-    ...SHARED_DEFAULTS,
-  },
-  {
     id: "vernavle",
     displayName: "Vernavle",
     handle: "vernavle",
@@ -49,7 +41,7 @@ export const PAGE_PROFILES: readonly PageProfile[] = [
   },
 ] as const;
 
-export const DEFAULT_PROFILE_ID = "zincad";
+export const DEFAULT_PROFILE_ID = "vernavle";
 
 export const getProfile = (id: string): PageProfile =>
   PAGE_PROFILES.find((p) => p.id === id) ?? PAGE_PROFILES[0];

@@ -117,7 +117,7 @@ export const stackedDefaultProps: StackedProps = {
   identity: {
     name: "Zinolt",
     handle: "zinolt",
-    avatarUrl: "/pages/zincad/avatar.jpg",
+    avatarUrl: "/brand/jujui.jpg",
     verified: false,
   },
   theme: "dark",
