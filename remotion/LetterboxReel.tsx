@@ -10,8 +10,7 @@ import { Video as MediaVideo } from "@remotion/media";
 import { BRAND, type Brand } from "../lib/brand";
 
 // Self-host Tenor Sans (woff2 in /public/brand) so the caption renders
-// reliably in both the Player and renderMediaOnWeb. Matches the existing
-// Cosmos Oracle pattern in Reel.tsx.
+// reliably in both the Player and renderMediaOnWeb.
 if (typeof window !== "undefined") {
   const handle = delayRender("Tenor Sans font");
   const face = new FontFace(
@@ -30,9 +29,6 @@ if (typeof window !== "undefined") {
 const COMP_W = 1080;
 const COMP_H = 1920;
 const COMP_FPS = 30;
-const VIDEO_ASPECT = 9 / 16; // 16:9 slot
-const DEFAULT_VIDEO_SCALE = 0.88; // 950 px at 1080 wide
-const DEFAULT_VIDEO_RADIUS = 28; // px
 const DEFAULT_CAPTION_SIZE = 42; // composition px
 export const CAPTION_POSITIONS = [
   "above",
@@ -41,7 +37,7 @@ export const CAPTION_POSITIONS = [
   "overBottom",
 ] as const;
 export type CaptionPosition = (typeof CAPTION_POSITIONS)[number];
-const DEFAULT_CAPTION_POSITION: CaptionPosition = "above";
+const DEFAULT_CAPTION_POSITION: CaptionPosition = "overBottom";
 
 const isAbsoluteUrl = (s: string) => /^(blob:|data:|https?:|file:)/i.test(s);
 const stripLeadingSlash = (p: string) => p.replace(/^\//, "");
@@ -58,13 +54,9 @@ export type LetterboxReelProps = {
   /** True only when rendering via renderMediaOnWeb — picks the @remotion/media
    *  decoder. The Player keeps the smoother OffthreadVideo path. */
   forRender: boolean;
-  /** Video width as a fraction of the composition width (0.5–1.0). */
-  videoScale: number;
-  /** Corner radius of the video slot, in composition pixels. */
-  videoRadius: number;
-  /** Optional caption rendered around / over the video in Tenor Sans. */
+  /** Optional caption rendered over the video in Tenor Sans. */
   caption: string;
-  /** Where the caption sits relative to the video slot. */
+  /** Where the caption sits over the video. */
   captionPosition: CaptionPosition;
   /** Caption font size in composition pixels. */
   captionSize: number;
@@ -76,21 +68,16 @@ export const letterboxDefaultProps: LetterboxReelProps = {
   startAt: 0,
   speed: 2,
   forRender: false,
-  videoScale: DEFAULT_VIDEO_SCALE,
-  videoRadius: DEFAULT_VIDEO_RADIUS,
   caption: "",
   captionPosition: DEFAULT_CAPTION_POSITION,
   captionSize: DEFAULT_CAPTION_SIZE,
 };
 
-// Hoisted so the Video receives a stable callback identity across renders
-// — re-creating it inline triggers re-mounts in @remotion/media.
+// Stable identity so @remotion/media doesn't re-mount on each render.
 const onMediaVideoError = () => "fallback" as const;
 
-// Swallows transient playback errors from the Player's <OffthreadVideo>.
-// The browser fires "data source error" if a SW range request races a clip
-// switch or the SW idle-died and lost its in-memory blob; we want a silent
-// retry on the next frame rather than Remotion's runtime error overlay.
+// Swallow transient Player errors — retries on next frame instead of
+// showing Remotion's runtime error overlay.
 const onOffthreadVideoError = (err: Error) => {
   if (process.env.NODE_ENV !== "production") {
     console.warn("[LetterboxReel] preview video error:", err.message);
@@ -103,8 +90,6 @@ export const LetterboxReel: React.FC<LetterboxReelProps> = ({
   startAt,
   speed,
   forRender,
-  videoScale,
-  videoRadius,
   caption,
   captionPosition,
   captionSize,
@@ -112,25 +97,14 @@ export const LetterboxReel: React.FC<LetterboxReelProps> = ({
   // source_time = composition_time × speed + trimBefore/fps
   // → trimBefore = startAt × fps skips the first `startAt` seconds of source.
   const trimBefore = Math.round(startAt * COMP_FPS);
-
-  // Video slot derived from videoScale — width is `videoScale × COMP_W`,
-  // height keeps the 16:9 aspect, centered.
-  const videoW = Math.round(COMP_W * videoScale);
-  const videoH = Math.round(videoW * VIDEO_ASPECT);
-  const videoLeft = (COMP_W - videoW) / 2;
-  const videoTop = (COMP_H - videoH) / 2;
-
-  // In the <Player> we use Remotion's native <OffthreadVideo>: it's backed by
-  // a normal HTML5 <video> element, so seeking and looping are smooth and we
-  // never hit WebCodecs flicker / decoder fallback handoffs mid-playback.
-  // renderMediaOnWeb requires @remotion/media's <Video>, so swap on that path.
   const resolvedSrc = clipSrc ? resolveSrc(clipSrc) : "";
 
   const trimmedCaption = caption.trim();
-  const captionGap = Math.round(captionSize * 0.7); // gap between caption and slot
-  const captionInset = Math.round(captionSize * 0.5); // inset from slot edge when overlaid
+  const captionInset = Math.round(captionSize * 1.4);
+  const captionAtTop =
+    captionPosition === "above" || captionPosition === "overTop";
 
-  const captionStyleBase: React.CSSProperties = {
+  const captionStyle: React.CSSProperties = {
     position: "absolute",
     left: 0,
     right: 0,
@@ -140,103 +114,45 @@ export const LetterboxReel: React.FC<LetterboxReelProps> = ({
     fontSize: captionSize,
     letterSpacing: "0.08em",
     lineHeight: 1.15,
+    color: "rgba(255, 255, 255, 0.95)",
+    textShadow: "0 2px 14px rgba(0, 0, 0, 0.55)",
     pointerEvents: "none",
+    ...(captionAtTop ? { top: captionInset } : { bottom: captionInset }),
   };
-  // "above"/"below" sit on the composition's black background — softer
-  // grey reads well there. "overTop"/"overBottom" need a shadow because
-  // they sit on top of the video.
-  const captionOnBlackColor = "rgba(255, 255, 255, 0.78)";
-  const captionOverlayColor = "rgba(255, 255, 255, 0.95)";
-  const captionOverlayShadow = "0 2px 14px rgba(0, 0, 0, 0.55)";
+
+  // Suppress unused warning — composition size is fixed but kept as a
+  // named constant for clarity.
+  void COMP_W;
+  void COMP_H;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       {clipSrc ? (
         <AbsoluteFill>
-          <div
-            style={{
-              position: "absolute",
-              left: videoLeft,
-              top: videoTop,
-              width: videoW,
-              height: videoH,
-              borderRadius: videoRadius,
-              overflow: "hidden",
-            }}
-          >
-            {forRender ? (
-              <MediaVideo
-                src={resolvedSrc}
-                trimBefore={trimBefore}
-                playbackRate={speed}
-                muted
-                onError={onMediaVideoError}
-                objectFit="contain"
-                style={{ width: "100%", height: "100%" }}
-              />
-            ) : (
-              <OffthreadVideo
-                src={resolvedSrc}
-                trimBefore={trimBefore}
-                playbackRate={speed}
-                muted
-                onError={onOffthreadVideoError}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            )}
+          {/* Full-canvas video — object-fit: cover crops overflow so a source
+              of any aspect fills the 9:16 frame edge-to-edge. */}
+          {forRender ? (
+            <MediaVideo
+              src={resolvedSrc}
+              trimBefore={trimBefore}
+              playbackRate={speed}
+              muted
+              onError={onMediaVideoError}
+              objectFit="cover"
+              style={{ width: "100%", height: "100%" }}
+            />
+          ) : (
+            <OffthreadVideo
+              src={resolvedSrc}
+              trimBefore={trimBefore}
+              playbackRate={speed}
+              muted
+              onError={onOffthreadVideoError}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          )}
 
-            {/* Caption when overlaid INSIDE the slot — clipped to the
-             *  rounded corners by the slot's overflow:hidden. */}
-            {trimmedCaption && captionPosition === "overTop" ? (
-              <div
-                style={{
-                  ...captionStyleBase,
-                  top: captionInset,
-                  color: captionOverlayColor,
-                  textShadow: captionOverlayShadow,
-                }}
-              >
-                {trimmedCaption}
-              </div>
-            ) : null}
-            {trimmedCaption && captionPosition === "overBottom" ? (
-              <div
-                style={{
-                  ...captionStyleBase,
-                  bottom: captionInset,
-                  color: captionOverlayColor,
-                  textShadow: captionOverlayShadow,
-                }}
-              >
-                {trimmedCaption}
-              </div>
-            ) : null}
-          </div>
-
-          {/* Caption when placed ABOVE / BELOW the slot — on the
-           *  composition background, matching the other templates. */}
-          {trimmedCaption && captionPosition === "above" ? (
-            <div
-              style={{
-                ...captionStyleBase,
-                top: videoTop - captionGap - captionSize,
-                color: captionOnBlackColor,
-              }}
-            >
-              {trimmedCaption}
-            </div>
-          ) : null}
-          {trimmedCaption && captionPosition === "below" ? (
-            <div
-              style={{
-                ...captionStyleBase,
-                top: videoTop + videoH + captionGap,
-                color: captionOnBlackColor,
-              }}
-            >
-              {trimmedCaption}
-            </div>
-          ) : null}
+          {trimmedCaption ? <div style={captionStyle}>{trimmedCaption}</div> : null}
         </AbsoluteFill>
       ) : null}
 

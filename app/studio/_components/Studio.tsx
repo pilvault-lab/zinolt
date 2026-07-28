@@ -30,8 +30,6 @@ import {
 } from "@/remotion/LetterboxReel";
 
 const LETTERBOX_DEFAULTS = {
-  videoScale: letterboxDefaultProps.videoScale,
-  videoRadius: letterboxDefaultProps.videoRadius,
   captionPosition: letterboxDefaultProps.captionPosition,
   captionSize: letterboxDefaultProps.captionSize,
 };
@@ -150,12 +148,6 @@ export const Studio: React.FC = () => {
   const [startAt, setStartAt] = useState<number>(0);
   const [endAt, setEndAt] = useState<number>(0);
   const [speed, setSpeed] = useState<number>(2);
-  const [videoScale, setVideoScale] = useState<number>(
-    LETTERBOX_DEFAULTS.videoScale,
-  );
-  const [videoRadius, setVideoRadius] = useState<number>(
-    LETTERBOX_DEFAULTS.videoRadius,
-  );
   const [caption, setCaption] = useState<string>("");
   const [captionPosition, setCaptionPosition] = useState<CaptionPosition>(
     LETTERBOX_DEFAULTS.captionPosition,
@@ -280,8 +272,6 @@ export const Studio: React.FC = () => {
         startAt,
         speed,
         forRender: false,
-        videoScale,
-        videoRadius,
         caption,
         captionPosition,
         captionSize,
@@ -304,8 +294,6 @@ export const Studio: React.FC = () => {
     clipUrl,
     startAt,
     speed,
-    videoScale,
-    videoRadius,
     caption,
     captionPosition,
     captionSize,
@@ -802,59 +790,6 @@ export const Studio: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              {/* ── Video size + corner ── */}
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <label
-                    className="font-sans text-xs uppercase tracking-wide"
-                    style={{ color: BRAND.colors.grey500 }}
-                  >
-                    Video
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVideoScale(LETTERBOX_DEFAULTS.videoScale);
-                      setVideoRadius(LETTERBOX_DEFAULTS.videoRadius);
-                    }}
-                    disabled={
-                      videoScale === LETTERBOX_DEFAULTS.videoScale &&
-                      videoRadius === LETTERBOX_DEFAULTS.videoRadius
-                    }
-                    className="font-sans text-[11px] underline-offset-2 transition-colors hover:underline disabled:cursor-default disabled:no-underline"
-                    style={{
-                      color:
-                        videoScale === LETTERBOX_DEFAULTS.videoScale &&
-                        videoRadius === LETTERBOX_DEFAULTS.videoRadius
-                          ? BRAND.colors.grey200
-                          : BRAND.colors.grey500,
-                      background: "none",
-                      padding: 0,
-                    }}
-                  >
-                    Reset
-                  </button>
-                </div>
-                <SliderRow
-                  label="Size"
-                  value={`${Math.round(videoScale * 100)}%`}
-                  min={0.5}
-                  max={1}
-                  step={0.01}
-                  valueNumber={videoScale}
-                  onChange={setVideoScale}
-                />
-                <SliderRow
-                  label="Corner"
-                  value={`${videoRadius}px`}
-                  min={0}
-                  max={80}
-                  step={1}
-                  valueNumber={videoRadius}
-                  onChange={setVideoRadius}
-                />
               </div>
 
               {/* ── Caption ── */}
