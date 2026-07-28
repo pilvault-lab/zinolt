@@ -62,6 +62,8 @@ export const ContentSurface: React.FC<{
   const BottomIcon = BOTTOM_ICONS[slide.bottomIconKey] ?? ChevronRight;
   const glassRgba = `rgba(255, 255, 255, ${slide.glassOpacity.toFixed(3)})`;
 
+  const vernavleFont = vernavle.style.fontFamily;
+
   return (
     <div
       className={vernavle.className}
@@ -74,6 +76,7 @@ export const ContentSurface: React.FC<{
         backgroundImage: isImage ? `url(${slide.bgImageSrc})` : "none",
         backgroundSize: "cover",
         backgroundPosition: "center",
+        fontFamily: vernavleFont,
       }}
     >
       <div
@@ -94,6 +97,7 @@ export const ContentSurface: React.FC<{
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
+          fontFamily: vernavleFont,
         }}
       >
         {/* Vernavle wordmark — top-right corner. */}
@@ -129,8 +133,9 @@ export const ContentSurface: React.FC<{
         >
           <div
             style={{
+              fontFamily: vernavleFont,
               fontSize: centerFontSize,
-              fontWeight: 700,
+              fontWeight: 400,
               lineHeight: 0.95,
               letterSpacing: "-0.025em",
               textTransform: "uppercase",
@@ -154,11 +159,12 @@ export const ContentSurface: React.FC<{
         >
           <span
             style={{
+              fontFamily: vernavleFont,
               fontSize: bottomFontSize,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               color: "rgba(255, 255, 255, 0.75)",
-              fontWeight: 500,
+              fontWeight: 400,
               flex: 1,
               textAlign: "left",
             }}
@@ -173,11 +179,12 @@ export const ContentSurface: React.FC<{
           />
           <span
             style={{
+              fontFamily: vernavleFont,
               fontSize: bottomFontSize,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               color: "rgba(255, 255, 255, 0.75)",
-              fontWeight: 500,
+              fontWeight: 400,
               flex: 1,
               textAlign: "right",
             }}
