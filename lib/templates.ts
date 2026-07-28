@@ -48,6 +48,14 @@ export const ARCHIVED_TEMPLATES: readonly Template[] = [
     preview: "/wall/wall-preview.svg",
     href: "/wall",
   },
+  {
+    id: "dangle",
+    compositionId: "Dangle",
+    label: "Dangle Card",
+    background: "",
+    preview: "/dangle/dangle-preview.svg",
+    href: "/dangle",
+  },
 ] as const;
 
 export const TEMPLATES: readonly Template[] = [
@@ -81,14 +89,6 @@ export const TEMPLATES: readonly Template[] = [
     background: "",
     preview: "/wire-carousel/preview.svg",
     href: "/wire-carousel",
-  },
-  {
-    id: "dangle",
-    compositionId: "Dangle",
-    label: "Dangle Card",
-    background: "",
-    preview: "/dangle/dangle-preview.svg",
-    href: "/dangle",
   },
   {
     id: "tweet-video",
