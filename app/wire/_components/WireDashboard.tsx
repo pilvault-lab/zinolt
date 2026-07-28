@@ -338,7 +338,7 @@ const WireRow: React.FC<{
       data-idx={index}
       onClick={onFocus}
       className={[
-        "grid grid-cols-[auto_1fr_auto] items-baseline gap-x-3 px-3 py-2 text-sm transition",
+        "grid grid-cols-[auto_1fr] items-start gap-x-2 gap-y-1 px-3 py-2 text-sm transition md:grid-cols-[auto_1fr_auto] md:items-baseline md:gap-x-3",
         focused ? "bg-[rgba(10,10,10,0.04)]" : "",
         row.used ? "opacity-50" : "",
       ].join(" ")}
@@ -365,20 +365,20 @@ const WireRow: React.FC<{
             href={row.url}
             target="_blank"
             rel="noreferrer"
-            className="truncate font-medium text-ds-on-surface hover:underline"
+            className="line-clamp-2 font-medium text-ds-on-surface hover:underline md:truncate"
             onClick={(e) => e.stopPropagation()}
           >
             {row.title}
           </a>
         </div>
         {row.snippet ? (
-          <p className="truncate text-xs text-ds-on-surface-muted">
+          <p className="line-clamp-2 text-xs text-ds-on-surface-muted md:truncate">
             {row.snippet}
           </p>
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 text-xs text-ds-on-surface-muted">
+      <div className="col-start-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ds-on-surface-muted md:col-start-auto md:shrink-0 md:flex-nowrap md:gap-2">
         <span className="rounded bg-[rgba(10,10,10,0.06)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
           {row.source_name}
         </span>
