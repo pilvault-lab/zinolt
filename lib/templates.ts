@@ -82,6 +82,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/tweet-video/preview.png",
     href: "/tweet-video",
   },
+  {
+    id: "reel-safe",
+    compositionId: "",
+    label: "Reel-Safe",
+    background: "",
+    preview: "/reel-safe/preview.svg",
+    href: "/reel-safe",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;

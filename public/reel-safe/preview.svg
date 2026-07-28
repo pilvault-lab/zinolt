@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" role="img" aria-label="Reel-Safe">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6366f1" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#6366f1" stop-opacity="1"/>
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="640" fill="url(#bg)"/>
+  <g fill="none" stroke="#334155" stroke-width="2">
+    <line x1="40" y1="180" x2="320" y2="180"/>
+    <line x1="40" y1="260" x2="320" y2="260"/>
+    <line x1="40" y1="340" x2="320" y2="340"/>
+    <line x1="40" y1="420" x2="320" y2="420"/>
+  </g>
+  <g fill="#6366f1">
+    <rect x="40" y="170" width="120" height="20" rx="4"/>
+    <rect x="180" y="250" width="90" height="20" rx="4"/>
+    <rect x="40" y="330" width="150" height="20" rx="4"/>
+    <rect x="200" y="410" width="100" height="20" rx="4"/>
+  </g>
+  <rect x="40" y="470" width="280" height="4" fill="url(#pulse)" rx="2"/>
+  <g fill="#94a3b8" font-family="ui-sans-serif, -apple-system, system-ui" text-anchor="middle">
+    <text x="180" y="90" font-size="26" font-weight="700" fill="#f8fafc">Reel-Safe</text>
+    <text x="180" y="120" font-size="13" letter-spacing="1.2">TRIM · SPEED · WATERMARK</text>
+    <text x="180" y="560" font-size="12">9:16 · 1.05x · algorithmically safe</text>
+  </g>
+  <g fill="#22d3ee">
+    <circle cx="322" cy="26" r="10"/>
+    <text x="322" y="30" font-size="12" text-anchor="middle" fill="#0f172a" font-family="ui-sans-serif" font-weight="700">RS</text>
+  </g>
+</svg>

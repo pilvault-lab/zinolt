@@ -44,9 +44,12 @@ next-env.d.ts
 /.claude/
 /.playwright-mcp/
 
-# Clip Studio workspace + rendered outputs (local dev box)
-/.clipstudio/
+# Reel-Safe workspace + rendered outputs (local dev box)
+/.reel-safe/
 /outputs/
+
+# Leftover local workspace from the removed Clip Studio scaffold (safe to delete)
+/.clipstudio/
 
 # The Wire — local SQLite store
 /.wire/
