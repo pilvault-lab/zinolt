@@ -368,23 +368,4 @@ export const WIRE_SOURCES: WireSource[] = [
     enabled: true,
   },
 
-  // ── SEC EDGAR Form 4 (insider transactions) — wealth watchlist ────────
-  // EDGAR enforces its fair-access policy by rejecting default UAs. Every
-  // request must identify the caller with a real contact string — spelled
-  // out in https://www.sec.gov/os/accessing-edgar-data. Titles from EDGAR
-  // are dry ("4 - Musk Elon"); the row is a nudge to go inspect the filing.
-  ...([
-    { name: "Tesla", cik: "0001318605" },
-    { name: "Amazon", cik: "0001018724" },
-    { name: "Meta", cik: "0001326801" },
-    { name: "NVIDIA", cik: "0001045810" },
-    { name: "Apple", cik: "0000320193" },
-  ].map<WireSource>(({ name, cik }) => ({
-    name: `SEC Form 4 / ${name}`,
-    category: "wealth",
-    type: "rss",
-    url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=4&dateb=&owner=include&count=20&output=atom`,
-    enabled: true,
-    headers: { "User-Agent": "Zinolt Wire admin@localhost" },
-  }))),
 ];
