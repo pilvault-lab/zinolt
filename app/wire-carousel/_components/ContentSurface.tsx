@@ -33,6 +33,7 @@ export type ContentSlideData = {
   cardWidthPct: number;
   cardHeightPct: number;
   centerText: string;
+  textScale: number;
   bottomLeft: string;
   bottomRight: string;
   bottomIconKey: string;
@@ -57,7 +58,7 @@ export const ContentSurface: React.FC<{
   const bottomFontSize = scaleBase * 0.018;
   const bottomIconSize = scaleBase * 0.03;
 
-  const centerFontSize = cardW * 0.085;
+  const centerFontSize = cardW * 0.085 * (slide.textScale ?? 1);
 
   const BottomIcon = BOTTOM_ICONS[slide.bottomIconKey] ?? ChevronRight;
   const glassRgba = `rgba(255, 255, 255, ${slide.glassOpacity.toFixed(3)})`;

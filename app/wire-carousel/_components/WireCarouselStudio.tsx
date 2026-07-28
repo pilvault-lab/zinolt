@@ -33,6 +33,7 @@ const DEFAULT_CONTENT: ContentSlideData = {
   cardWidthPct: 0.88,
   cardHeightPct: 0.78,
   centerText: "Add your\ntake here",
+  textScale: 1,
   bottomLeft: "Vernavle · Wire",
   bottomRight: "Read more",
   bottomIconKey: "chevronRight",
@@ -1115,6 +1116,15 @@ const ContentEditor: React.FC<{
           onChange={(e) => onChange({ centerText: e.target.value })}
           placeholder="Your text"
           style={{ ...inputStyle, resize: "vertical", lineHeight: 1.35 }}
+        />
+        <NumberSlider
+          label="Size"
+          value={slide.textScale ?? 1}
+          min={0.5}
+          max={2}
+          step={0.05}
+          suffix="×"
+          onChange={(v) => onChange({ textScale: v })}
         />
       </div>
 
