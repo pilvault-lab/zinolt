@@ -10,6 +10,7 @@ export const revalidate = 0;
 const CATEGORIES: Array<WireCategory | "all"> = [
   "all",
   "markets",
+  "wealth",
   "fintech",
   "tech",
   "predictions",

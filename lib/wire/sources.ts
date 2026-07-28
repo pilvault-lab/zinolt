@@ -9,7 +9,8 @@ export type WireCategory =
   | "fintech"
   | "tech"
   | "predictions"
-  | "culture";
+  | "culture"
+  | "wealth";
 
 export type WireSourceType = "rss" | "reddit" | "hn" | "polymarket";
 
@@ -19,6 +20,10 @@ export type WireSource = {
   type: WireSourceType;
   url: string;
   enabled: boolean;
+  // Extra request headers merged over the fetcher's defaults. Required for
+  // sources with strict UA rules — SEC EDGAR, for one, expects a
+  // descriptive User-Agent identifying the caller.
+  headers?: Record<string, string>;
 };
 
 export const WIRE_SOURCES: WireSource[] = [
@@ -258,4 +263,128 @@ export const WIRE_SOURCES: WireSource[] = [
     url: "https://www.astralcodexten.com/feed",
     enabled: true,
   },
+
+  // ── Mainstream business / wealth ──────────────────────────────────────
+  // Bloomberg + WSJ headlines flow through public RSS even though the
+  // article bodies are paywalled — the row is a "worth going to look"
+  // signal, not the full read.
+  {
+    name: "Fortune",
+    category: "wealth",
+    type: "rss",
+    url: "https://fortune.com/feed/",
+    enabled: true,
+  },
+  {
+    name: "Business Insider Markets",
+    category: "markets",
+    type: "rss",
+    url: "https://markets.businessinsider.com/rss/news",
+    enabled: true,
+  },
+  {
+    name: "Business Insider",
+    category: "wealth",
+    type: "rss",
+    url: "https://www.businessinsider.com/rss",
+    enabled: true,
+  },
+  {
+    name: "Bloomberg Markets",
+    category: "markets",
+    type: "rss",
+    url: "https://feeds.bloomberg.com/markets/news.rss",
+    enabled: true,
+  },
+  {
+    // Bloomberg Wealth serves an empty <channel> — the 301 redirect lands
+    // at a valid feed URL but with zero items (verified 2026-07-27). Left
+    // in place in case Bloomberg starts publishing it again.
+    name: "Bloomberg Wealth",
+    category: "wealth",
+    type: "rss",
+    url: "https://feeds.bloomberg.com/wealth/news.rss",
+    enabled: false,
+  },
+  {
+    name: "Bloomberg Technology",
+    category: "tech",
+    type: "rss",
+    url: "https://feeds.bloomberg.com/technology/news.rss",
+    enabled: true,
+  },
+  {
+    name: "Forbes Business",
+    category: "wealth",
+    type: "rss",
+    url: "https://www.forbes.com/business/feed/",
+    enabled: true,
+  },
+  {
+    name: "WSJ Markets",
+    category: "markets",
+    type: "rss",
+    url: "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
+    enabled: true,
+  },
+  {
+    name: "WSJ Technology",
+    category: "tech",
+    type: "rss",
+    url: "https://feeds.content.dowjones.io/public/rss/RSSWSJD",
+    enabled: true,
+  },
+
+  // ── Culture / trend trackers ──────────────────────────────────────────
+  {
+    name: "Rest of World",
+    category: "culture",
+    type: "rss",
+    url: "https://restofworld.org/feed/",
+    enabled: true,
+  },
+  {
+    name: "Fast Company",
+    category: "culture",
+    type: "rss",
+    url: "https://www.fastcompany.com/rss",
+    enabled: true,
+  },
+  {
+    name: "Morning Brew",
+    category: "culture",
+    type: "rss",
+    url: "https://www.morningbrew.com/feed",
+    enabled: true,
+  },
+  {
+    // Pirate Wires' own domain (piratewires.com) 429s aggressively —
+    // Cloudflare bot protection. The Substack mirror at
+    // piratewires.substack.com serves the same content freely.
+    name: "Pirate Wires",
+    category: "culture",
+    type: "rss",
+    url: "https://piratewires.substack.com/feed",
+    enabled: true,
+  },
+
+  // ── SEC EDGAR Form 4 (insider transactions) — wealth watchlist ────────
+  // EDGAR enforces its fair-access policy by rejecting default UAs. Every
+  // request must identify the caller with a real contact string — spelled
+  // out in https://www.sec.gov/os/accessing-edgar-data. Titles from EDGAR
+  // are dry ("4 - Musk Elon"); the row is a nudge to go inspect the filing.
+  ...([
+    { name: "Tesla", cik: "0001318605" },
+    { name: "Amazon", cik: "0001018724" },
+    { name: "Meta", cik: "0001326801" },
+    { name: "NVIDIA", cik: "0001045810" },
+    { name: "Apple", cik: "0000320193" },
+  ].map<WireSource>(({ name, cik }) => ({
+    name: `SEC Form 4 / ${name}`,
+    category: "wealth",
+    type: "rss",
+    url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=4&dateb=&owner=include&count=20&output=atom`,
+    enabled: true,
+    headers: { "User-Agent": "Zinolt Wire admin@localhost" },
+  }))),
 ];
