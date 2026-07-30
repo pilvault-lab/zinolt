@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" fill="none">
+  <rect width="270" height="480" fill="#000"/>
+  <text x="135" y="150" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" font-size="14" fill="rgba(255,255,255,0.6)" letter-spacing="2">TIME MACHINE</text>
+  <text x="135" y="240" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="500" font-size="48" fill="#fff" letter-spacing="-2">$273,322</text>
+  <text x="135" y="270" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="rgba(255,255,255,0.5)" letter-spacing="4">2026</text>
+  <path d="M 30 380 L 60 372 L 90 360 L 120 330 L 150 290 L 180 240 L 210 200 L 240 150" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="240" cy="150" r="4" fill="#fff"/>
+</svg>

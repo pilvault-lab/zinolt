@@ -7,12 +7,10 @@ import { Header } from "./_components/Header";
 
 export default function Home() {
   return (
-    <div
-      className="flex min-h-screen flex-col md:h-screen md:min-h-0 md:overflow-hidden bg-ds-surface text-ds-on-surface"
-    >
+    <div className="flex min-h-screen flex-col bg-ds-surface text-ds-on-surface">
       <Header />
 
-      <main className="flex flex-1 flex-col items-center px-6 md:min-h-0">
+      <main className="flex flex-1 flex-col items-center px-6">
         {/* Hero — spacing-token vertical rhythm. */}
         <section className="mx-auto max-w-2xl text-center pt-(--ds-space-xl) pb-(--ds-space-lg) md:pt-20 md:pb-(--ds-space-md)">
           <h1
@@ -28,10 +26,9 @@ export default function Home() {
           </p>
         </section>
 
-        {/* Template grid — 3×2 on desktop so the current 6 tiles all fit
-            inside the h-screen viewport without being clipped by
-            overflow-hidden. */}
-        <section className="grid w-full max-w-5xl grid-cols-1 gap-(--ds-space-md) md:min-h-0 md:flex-1 md:grid-cols-3 md:grid-rows-2 pb-(--ds-space-lg)">
+        {/* Template grid — 3 cols on desktop, page scrolls to reveal the
+            7th tile (previously constrained to h-screen with 6 tiles). */}
+        <section className="grid w-full max-w-5xl grid-cols-1 gap-(--ds-space-md) md:grid-cols-3 pb-(--ds-space-lg)">
           {TEMPLATES.map((t) => (
             <Card
               key={t.id}

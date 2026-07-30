@@ -10,6 +10,14 @@ import {
   StackedComposition,
   stackedDefaultProps,
 } from "./tweet/StackedComposition";
+import {
+  TimeMachine,
+  timeMachineDefaultProps,
+  TM_FPS,
+  TM_HEIGHT,
+  TM_TOTAL_FRAMES,
+  TM_WIDTH,
+} from "./time-machine/TimeMachine";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -29,8 +37,17 @@ const STACKED_ASPECTS = [
 
 export const RemotionRoot: React.FC = () => (
   <>
+    <Composition
+      id="TimeMachine"
+      component={TimeMachine}
+      durationInFrames={TM_TOTAL_FRAMES}
+      fps={TM_FPS}
+      width={TM_WIDTH}
+      height={TM_HEIGHT}
+      defaultProps={timeMachineDefaultProps}
+    />
     {TEMPLATES.filter(
-      (t) => t.id !== "letterbox" && t.id !== "tweet-video",
+      (t) => t.id !== "letterbox" && t.id !== "tweet-video" && t.id !== "time-machine",
     ).map((t) => (
       <Composition
         key={t.compositionId}

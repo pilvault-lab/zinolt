@@ -106,6 +106,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/reel-safe/preview.svg",
     href: "/reel-safe",
   },
+  {
+    id: "time-machine",
+    compositionId: "TimeMachine",
+    label: "Time Machine",
+    background: "",
+    preview: "/time-machine/preview.svg",
+    href: "/time-machine",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
