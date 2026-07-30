@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Player } from "@remotion/player";
 import {
@@ -146,14 +146,17 @@ export const TimeMachineStudio: React.FC = () => {
     }
   }, [symbol, customSymbol, year, amount]);
 
-  // Auto-generate NVDA 2016 on first mount so the page never sits empty.
-  const didAutoGen = useRef(false);
+  // Auto-fetch whenever the ticker / year / amount changes so the preview
+  // always reflects the current selection. Debounced so rapid tile-clicks
+  // (or typing in the custom-ticker field) collapse into a single request.
   useEffect(() => {
-    if (didAutoGen.current) return;
-    didAutoGen.current = true;
-    void generate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Don't fire on an empty custom ticker.
+    if (symbol === "__custom" && customSymbol.trim().length === 0) return;
+    const t = setTimeout(() => {
+      void generate();
+    }, 250);
+    return () => clearTimeout(t);
+  }, [symbol, customSymbol, year, amount, generate]);
 
   const activeSymbol = symbol === "__custom" ? customSymbol.trim().toUpperCase() : symbol;
   const activeTicker = findCuratedTicker(activeSymbol);
