@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   interpolate,
   spring,
@@ -58,7 +59,44 @@ export type TimeMachineProps = {
   logoUrl: string | null; // null → render text wordmark
   /** Ignored today; forRender parity with other comps. */
   forRender?: boolean;
+  /** Optional narration. If hookAudioUrl is set, the hook section stretches
+   *  to max(2.5s, hookDurationSec + 0.4s) and everything after SHIFTS by the
+   *  extra time (not compressed). ctaAudioUrl is the static Comment-the-next-
+   *  ticker file — defaults to the pre-baked one in /public. */
+  hookAudioUrl?: string | null;
+  hookDurationSec?: number; // measured client-side before render
+  ctaAudioUrl?: string | null;
+  narrationEnabled?: boolean;
 };
+
+/** Baked-in default CTA audio (generated once during the build). */
+export const TM_CTA_AUDIO_DEFAULT = "/time-machine/audio/cta.mp3";
+
+/**
+ * Compute effective section starts/ends and total duration given a hook
+ * audio duration. Sections after the hook SHIFT (never compress).
+ * Returns everything in seconds AND frames so the studio + composition
+ * agree on timing.
+ */
+export function computeTimeMachineTiming(hookAudioSec: number | undefined) {
+  const baseHookDur = TM_SECTIONS.hook.end - TM_SECTIONS.hook.start; // 2.5
+  const hasHookAudio = typeof hookAudioSec === "number" && hookAudioSec > 0;
+  const effHookDur = hasHookAudio
+    ? Math.max(baseHookDur, hookAudioSec + 0.4)
+    : baseHookDur;
+  const shift = effHookDur - baseHookDur;
+  const totalSec =
+    TM_SECTIONS.cta.end + shift; // TM_TOTAL_SEC baseline + hook shift
+  return {
+    hook:   { start: TM_SECTIONS.hook.start,        end: TM_SECTIONS.hook.start + effHookDur },
+    ride:   { start: TM_SECTIONS.ride.start + shift,  end: TM_SECTIONS.ride.end + shift },
+    payoff: { start: TM_SECTIONS.payoff.start + shift,end: TM_SECTIONS.payoff.end + shift },
+    cta:    { start: TM_SECTIONS.cta.start + shift,   end: TM_SECTIONS.cta.end + shift },
+    totalSec,
+    totalFrames: Math.round(totalSec * TM_FPS),
+    shift,
+  };
+}
 
 export const timeMachineDefaultProps: TimeMachineProps = {
   portfolio: {
@@ -651,8 +689,19 @@ export const TimeMachine: React.FC<TimeMachineProps> = ({
   portfolio,
   tickerName,
   logoUrl,
+  hookAudioUrl,
+  hookDurationSec,
+  ctaAudioUrl,
+  narrationEnabled,
 }) => {
-  const secs = TM_SECTIONS;
+  const narrationOn = narrationEnabled !== false; // default ON
+  const hookAudio = narrationOn ? hookAudioUrl : null;
+  const ctaAudio = narrationOn
+    ? (ctaAudioUrl ?? TM_CTA_AUDIO_DEFAULT)
+    : null;
+
+  const secs = computeTimeMachineTiming(hookAudio ? hookDurationSec : 0);
+
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <Sequence from={sec(secs.hook.start)} durationInFrames={sec(secs.hook.end - secs.hook.start)}>
@@ -672,7 +721,21 @@ export const TimeMachine: React.FC<TimeMachineProps> = ({
       <Sequence from={sec(secs.cta.start)} durationInFrames={sec(secs.cta.end - secs.cta.start)}>
         <Cta />
       </Sequence>
-      <CornerLogo />
+
+      {/* Narration audio — Remotion's <Audio> is muxed by @remotion/web-renderer
+          on export. Hook plays from frame 0; CTA at its (shifted) start. */}
+      {hookAudio ? (
+        <Sequence from={0} durationInFrames={sec(secs.hook.end)}>
+          <Audio src={hookAudio} volume={1} />
+        </Sequence>
+      ) : null}
+      {ctaAudio ? (
+        <Sequence from={sec(secs.cta.start)} durationInFrames={sec(secs.cta.end - secs.cta.start)}>
+          <Audio src={ctaAudio} volume={1} />
+        </Sequence>
+      ) : null}
+
+      <CornerLogo totalFrames={secs.totalFrames} />
       <FilmGrain />
     </AbsoluteFill>
   );
@@ -681,7 +744,9 @@ export const TimeMachine: React.FC<TimeMachineProps> = ({
 /** Persistent Vernavle wordmark, top-right. Sits below the top crop safe
  *  area so IG / TikTok chrome doesn't clip it. Fades in on the first beat
  *  and out with the final black-out. */
-const CornerLogo: React.FC = () => {
+const CornerLogo: React.FC<{ totalFrames?: number }> = ({
+  totalFrames = TM_TOTAL_FRAMES,
+}) => {
   const frame = useCurrentFrame();
   const fadeIn = interpolate(frame, [sec(0.3), sec(1.0)], [0, 1], {
     extrapolateLeft: "clamp",
@@ -689,7 +754,7 @@ const CornerLogo: React.FC = () => {
   });
   const fadeOut = interpolate(
     frame,
-    [TM_TOTAL_FRAMES - sec(0.5), TM_TOTAL_FRAMES],
+    [totalFrames - sec(0.5), totalFrames],
     [1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );

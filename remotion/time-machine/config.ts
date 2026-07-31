@@ -65,8 +65,8 @@ export const TM_SIZES = {
   ctaFoot: 44,
   logoHeightHook: 220,
   // Persistent Vernavle mark, top-right. Offset below top crop safe area.
-  cornerLogoHeight: 120,
-  cornerLogoTop: 90,
+  cornerLogoHeight: 240,
+  cornerLogoTop: 100,
   cornerLogoRight: 60,
   gridOpacity: 0.08,
   glowBlur: 26,

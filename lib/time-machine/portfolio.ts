@@ -32,6 +32,9 @@ export type PortfolioResult = {
   milestones: Milestone[];
   /** Latest data date, for staleness indication. */
   latestDate: string;
+  /** Company name from Yahoo search — used when the custom ticker isn't in
+   *  the curated list. Optional; falls back to symbol if lookup fails. */
+  companyName?: string;
 };
 
 /** Parse Stooq monthly CSV. First row is header:

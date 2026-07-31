@@ -29,6 +29,8 @@ import type { PortfolioResult } from "@/lib/time-machine/portfolio";
 import {
   TimeMachine,
   timeMachineDefaultProps,
+  computeTimeMachineTiming,
+  TM_CTA_AUDIO_DEFAULT,
   TM_FPS,
   TM_HEIGHT,
   TM_TOTAL_FRAMES,
@@ -36,6 +38,36 @@ import {
   type TimeMachineProps,
 } from "@/remotion/time-machine/TimeMachine";
 import { Header } from "../../_components/Header";
+
+const TTS_VOICES = [
+  { id: "en-US-ChristopherNeural", label: "Christopher (US)" },
+  { id: "en-US-GuyNeural",         label: "Guy (US)" },
+  { id: "en-GB-RyanNeural",        label: "Ryan (UK)" },
+] as const;
+const DEFAULT_VOICE = "en-GB-RyanNeural";
+
+async function measureAudioDuration(url: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const a = new window.Audio();
+    a.preload = "metadata";
+    const done = (v: number) => {
+      a.onloadedmetadata = null;
+      a.onerror = null;
+      resolve(v);
+    };
+    a.onloadedmetadata = () => done(a.duration);
+    a.onerror = () => {
+      a.onloadedmetadata = null;
+      a.onerror = null;
+      reject(new Error("audio_metadata_failed"));
+    };
+    a.src = url;
+  });
+}
+
+function buildHookSentence(amount: number, tickerName: string, year: number) {
+  return `What if you invested $${amount.toLocaleString("en-US")} in ${tickerName} in ${year}?`;
+}
 
 const PLAYER_MAX_W = 380;
 
@@ -87,6 +119,14 @@ export const TimeMachineStudio: React.FC = () => {
   const [portfolio, setPortfolio] = useState<PortfolioResult | null>(null);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string>("");
+
+  // Narration state
+  const [narrationEnabled, setNarrationEnabled] = useState(true);
+  const [voice, setVoice] = useState<string>(DEFAULT_VOICE);
+  const [hookAudioUrl, setHookAudioUrl] = useState<string | null>(null);
+  const [hookAudioSec, setHookAudioSec] = useState(0);
+  const [narrationLoading, setNarrationLoading] = useState(false);
+  const [narrationError, setNarrationError] = useState("");
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -160,8 +200,70 @@ export const TimeMachineStudio: React.FC = () => {
 
   const activeSymbol = symbol === "__custom" ? customSymbol.trim().toUpperCase() : symbol;
   const activeTicker = findCuratedTicker(activeSymbol);
-  const tickerName = activeTicker?.name ?? activeSymbol;
+  // Prefer the Yahoo-resolved companyName (works for any ticker, including
+  // custom entries not in our curated list). Fall back to the curated
+  // display name if we haven't fetched yet, and to the raw symbol as last resort.
+  const tickerName = portfolio?.companyName ?? activeTicker?.name ?? activeSymbol;
   const logoUrl = activeTicker?.logo ?? null;
+
+  // Fetch narration whenever inputs change AND narration is on. Clean up
+  // stale object URLs. Failures degrade gracefully — no audio, no block.
+  useEffect(() => {
+    if (!portfolio || !narrationEnabled) {
+      // Revoke any existing URL when narration is toggled off.
+      if (hookAudioUrl) {
+        URL.revokeObjectURL(hookAudioUrl);
+        setHookAudioUrl(null);
+        setHookAudioSec(0);
+      }
+      setNarrationError("");
+      return;
+    }
+    let cancelled = false;
+    setNarrationLoading(true);
+    setNarrationError("");
+    const sentence = buildHookSentence(portfolio.amount, tickerName, portfolio.year);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/tts?text=${encodeURIComponent(sentence)}&voice=${encodeURIComponent(voice)}`,
+        );
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        const rawDur = await measureAudioDuration(url).catch(() => 0);
+        // Chrome MP3 quirk: some MP3s report Infinity until fully played.
+        // Fall back to a byte-rate estimate (96kbps mono).
+        const cleanDur = Number.isFinite(rawDur) && rawDur > 0
+          ? rawDur
+          : (blob.size * 8) / (96 * 1000);
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        setHookAudioUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+        setHookAudioSec(cleanDur);
+      } catch {
+        if (!cancelled) setNarrationError("Narration unavailable — rendering silent.");
+      } finally {
+        if (!cancelled) setNarrationLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portfolio, tickerName, voice, narrationEnabled]);
+
+  // Effective timing (hook stretches, everything else shifts).
+  const timing = useMemo(
+    () => computeTimeMachineTiming(narrationEnabled && hookAudioUrl ? hookAudioSec : 0),
+    [narrationEnabled, hookAudioUrl, hookAudioSec],
+  );
 
   const inputProps = useMemo<TimeMachineProps>(
     () =>
@@ -171,10 +273,31 @@ export const TimeMachineStudio: React.FC = () => {
             tickerName,
             logoUrl,
             forRender: false,
+            narrationEnabled,
+            hookAudioUrl: narrationEnabled ? hookAudioUrl : null,
+            hookDurationSec: hookAudioSec,
+            ctaAudioUrl: narrationEnabled ? TM_CTA_AUDIO_DEFAULT : null,
           }
         : timeMachineDefaultProps,
-    [portfolio, tickerName, logoUrl],
+    [portfolio, tickerName, logoUrl, narrationEnabled, hookAudioUrl, hookAudioSec],
   );
+
+  const playVoiceSample = useCallback(async () => {
+    const sample = "Hello, this is a sample of the narration voice.";
+    try {
+      const res = await fetch(
+        `/api/tts?text=${encodeURIComponent(sample)}&voice=${encodeURIComponent(voice)}`,
+      );
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = new window.Audio(url);
+      a.play().catch(() => {});
+      a.onended = () => URL.revokeObjectURL(url);
+    } catch {
+      setNarrationError("Sample failed to play.");
+    }
+  }, [voice]);
 
   // Player sizing — same pattern as tweet-video studio.
   const [playerDims, setPlayerDims] = useState({ w: 0, h: 0 });
@@ -197,12 +320,14 @@ export const TimeMachineStudio: React.FC = () => {
     setIsRendering(true);
     setProgress(0);
     try {
+      const totalFrames = timing.totalFrames;
+      const narrationOn = narrationEnabled && Boolean(hookAudioUrl);
       const { getBlob } = await renderMediaOnWeb({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         composition: {
           id: "TimeMachine",
           component: TimeMachine,
-          durationInFrames: TM_TOTAL_FRAMES,
+          durationInFrames: totalFrames,
           fps: TM_FPS,
           width: TM_WIDTH,
           height: TM_HEIGHT,
@@ -210,7 +335,7 @@ export const TimeMachineStudio: React.FC = () => {
           calculateMetadata: () => ({
             width: TM_WIDTH,
             height: TM_HEIGHT,
-            durationInFrames: TM_TOTAL_FRAMES,
+            durationInFrames: totalFrames,
             fps: TM_FPS,
           }),
         } as any,
@@ -218,15 +343,13 @@ export const TimeMachineStudio: React.FC = () => {
         inputProps: { ...inputProps, forRender: true } as any,
         licenseKey: "free-license",
         videoCodec: "h264",
-        // 'very-high' preset — top-tier bitrate for 1080x1920 60fps.
         videoBitrate: "very-high",
         hardwareAcceleration: "prefer-hardware",
-        // 4s GOP (was 2s) — halves the keyframe count, encoder does less
-        // work, quality unaffected for social playback (no scrubbing needed).
         keyframeIntervalInSeconds: 4,
-        muted: true,
-        // Skip the audio path entirely — nothing to sync.
-        audioCodec: null,
+        // Audio: mux with AAC when narration is on (hook + static CTA).
+        muted: !narrationOn,
+        audioCodec: narrationOn ? "aac" : null,
+        audioBitrate: narrationOn ? "high" : undefined,
         delayRenderTimeoutInMilliseconds: 60_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
@@ -244,7 +367,7 @@ export const TimeMachineStudio: React.FC = () => {
     } finally {
       setIsRendering(false);
     }
-  }, [portfolio, inputProps, activeSymbol, amount]);
+  }, [portfolio, inputProps, activeSymbol, amount, timing.totalFrames, narrationEnabled, hookAudioUrl]);
 
   return (
     <div
@@ -402,6 +525,66 @@ export const TimeMachineStudio: React.FC = () => {
             {fetching ? "Fetching…" : "Generate"}
           </Button>
 
+          {/* Narration controls — TTS via Edge, optional. */}
+          <div className="flex flex-col gap-2 rounded-md border p-3"
+               style={{ borderColor: BRAND.colors.grey200 }}>
+            <label className="flex items-center justify-between font-sans text-xs uppercase tracking-wide"
+                   style={{ color: BRAND.colors.grey500 }}>
+              <span>Narration</span>
+              <span className="flex items-center gap-2 normal-case tracking-normal"
+                    style={{ color: BRAND.colors.ink }}>
+                <input
+                  type="checkbox"
+                  checked={narrationEnabled}
+                  onChange={(e) => setNarrationEnabled(e.target.checked)}
+                />
+                <span>on</span>
+              </span>
+            </label>
+            {narrationEnabled ? (
+              <>
+                <div className="flex gap-2">
+                  <Select value={voice} onValueChange={setVoice}>
+                    <SelectTrigger className="flex-1 font-sans text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TTS_VOICES.map((v) => (
+                        <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={playVoiceSample}
+                    className="font-sans text-xs"
+                  >
+                    Sample
+                  </Button>
+                </div>
+                <p className="font-sans text-[11px] leading-snug"
+                   style={{ color: BRAND.colors.grey500 }}>
+                  {narrationLoading
+                    ? "Generating narration…"
+                    : hookAudioUrl
+                      ? `Hook audio ready (${hookAudioSec.toFixed(1)}s). CTA is pre-baked.`
+                      : "Waiting for data — narration will render once picks load."}
+                </p>
+                {narrationError ? (
+                  <p role="alert" className="font-sans text-[11px]"
+                     style={{ color: BRAND.colors.ink }}>
+                    {narrationError}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="font-sans text-[11px]" style={{ color: BRAND.colors.grey500 }}>
+                Video will render silent.
+              </p>
+            )}
+          </div>
+
           {fetchError ? (
             <p
               role="alert"
@@ -452,7 +635,7 @@ export const TimeMachineStudio: React.FC = () => {
             <Player
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               component={TimeMachine as any}
-              durationInFrames={TM_TOTAL_FRAMES}
+              durationInFrames={timing.totalFrames}
               fps={TM_FPS}
               compositionWidth={TM_WIDTH}
               compositionHeight={TM_HEIGHT}
