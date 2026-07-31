@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" fill="none">
+  <rect width="270" height="480" fill="#000"/>
+  <text x="135" y="60" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" font-size="12" fill="rgba(255,255,255,0.6)" letter-spacing="3">DAILY MOVERS</text>
+  <text x="135" y="130" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="500" font-size="26" fill="#fff" letter-spacing="-1">NBIS</text>
+  <text x="135" y="180" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="500" font-size="48" fill="#fff" letter-spacing="-2">+27.1%</text>
+  <line x1="30" y1="330" x2="240" y2="330" stroke="rgba(255,255,255,0.25)" stroke-dasharray="3 5"/>
+  <path d="M 30 340 L 60 335 L 90 320 L 120 310 L 150 260 L 180 240 L 210 220 L 240 230" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="240" cy="230" r="3" fill="#fff"/>
+  <text x="135" y="410" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="rgba(255,255,255,0.6)">+$13.0B market cap</text>
+</svg>

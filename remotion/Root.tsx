@@ -18,6 +18,14 @@ import {
   TM_TOTAL_FRAMES,
   TM_WIDTH,
 } from "./time-machine/TimeMachine";
+import {
+  DailyMovers,
+  dailyMoversDefaultProps,
+  DM_FPS,
+  DM_HEIGHT,
+  DM_TOTAL_FRAMES,
+  DM_WIDTH,
+} from "./daily-movers/DailyMovers";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -46,8 +54,21 @@ export const RemotionRoot: React.FC = () => (
       height={TM_HEIGHT}
       defaultProps={timeMachineDefaultProps}
     />
+    <Composition
+      id="DailyMovers"
+      component={DailyMovers}
+      durationInFrames={DM_TOTAL_FRAMES}
+      fps={DM_FPS}
+      width={DM_WIDTH}
+      height={DM_HEIGHT}
+      defaultProps={dailyMoversDefaultProps}
+    />
     {TEMPLATES.filter(
-      (t) => t.id !== "letterbox" && t.id !== "tweet-video" && t.id !== "time-machine",
+      (t) =>
+        t.id !== "letterbox" &&
+        t.id !== "tweet-video" &&
+        t.id !== "time-machine" &&
+        t.id !== "daily-movers",
     ).map((t) => (
       <Composition
         key={t.compositionId}
