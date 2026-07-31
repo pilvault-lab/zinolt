@@ -526,8 +526,9 @@ const Movers: React.FC<{
   // Horizontal anchor.
   const stripItemW = DM_SIZES.stripItemW;
   const stripGap = DM_SIZES.stripGap;
-  const stripTotalW = 5 * stripItemW + 4 * stripGap;
-  const stripLeftPad = (DM_WIDTH - stripTotalW) / 2;
+  // Left-align the strip to the chart's left edge so pill columns line up
+  // with the chart's plot area rather than floating in a centered block.
+  const stripLeftPad = DM_SIZES.chartLeftX;
   const stripTopY = DM_SIZES.stripTop;
 
   // Per-row reflow progress (staggered).

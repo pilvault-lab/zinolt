@@ -41,8 +41,8 @@ export const DM_SPRINGS = {
  * sits above the band, time marker below, ticker stack centered on it.
  * Defined as fractions of frame height so the band is a design constant.
  */
-export const DM_CHART_TOP_FRAC    = 0.32;   // middle-third band
-export const DM_CHART_BOTTOM_FRAC = 0.68;
+export const DM_CHART_TOP_FRAC    = 0.28;   // shifted up so post-transition
+export const DM_CHART_BOTTOM_FRAC = 0.64;   // horizontal strip sits higher
 
 /** X-scale runway for the synthetic origin — 7% of plot width before the
  *  9:30 opening print. Gap-move draws as a steep diagonal, not vertical. */
@@ -50,7 +50,7 @@ export const DM_LAUNCH_RUNWAY_FRAC = 0.07;
 
 /** Y-scale padding on top/bottom of the data range, as a fraction of that
  *  range. Prevents the extremes from kissing the band edges. */
-export const DM_Y_PADDING_FRAC = 0.08;
+export const DM_Y_PADDING_FRAC = 0.12;
 
 // Derived from fractions — safe to import and use as concrete pixel values.
 export const DM_CHART_TOP    = Math.round(DM_HEIGHT * DM_CHART_TOP_FRAC);
@@ -66,9 +66,10 @@ export const DM_SIZES = {
   // the whole block ends ~24px above the chart top.
   headerTop: DM_CHART_TOP - 110,
 
-  // Chart plot area. y-values derived from the fixed band.
-  chartLeftX: 50,
-  chartRightX: 780,
+  // Chart plot area. Extra L/R margin so leading dots + line ends don't
+  // kiss the frame / ticker-stack edges.
+  chartLeftX: 70,
+  chartRightX: 760,
   chartTop: DM_CHART_TOP,
   chartHeight: DM_CHART_HEIGHT,
 
@@ -88,8 +89,8 @@ export const DM_SIZES = {
 
   // Horizontal strip — sits below the plot band + time indicator.
   stripTop: DM_CHART_BOTTOM + 130,
-  stripItemW: 195,
-  stripGap: 12,
+  stripItemW: 190,
+  stripGap: 10,
   stripPillWidth: 6,
   stripPillHeight: 44,
   stripTicker: 32,
