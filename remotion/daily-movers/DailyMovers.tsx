@@ -435,16 +435,6 @@ const RaceChart: React.FC<{
       height={DM_HEIGHT}
       style={{ position: "absolute", inset: 0, opacity: chartOpacity }}
     >
-      <defs>
-        {/* Colored glow — feGaussianBlur on colored source preserves hue. */}
-        <filter id="dm-line-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation={DM_SIZES.glowBlur} />
-        </filter>
-        <filter id="dm-dot-glow" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation={DM_SIZES.glowBlurStrong} />
-        </filter>
-      </defs>
-
       {/* Zero line */}
       <line
         x1={chartX}
@@ -456,32 +446,19 @@ const RaceChart: React.FC<{
         strokeWidth={DM_STROKE.zeroLine}
       />
 
-      {/* Lines: two passes per mover — outer colored glow + core stroke. */}
+      {/* Lines — flat core stroke, no glow. */}
       {race.pctSeries.map((_, i) => {
         const color = DM_PALETTE[i] ?? "#fff";
         return (
-          <g key={`line-${i}`}>
-            {/* Outer glow — SAME color, wide + blurred + high alpha */}
-            <path
-              d={paths[i]}
-              fill="none"
-              stroke={color}
-              strokeOpacity={0.55}
-              strokeWidth={DM_STROKE.line * 3.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#dm-line-glow)"
-            />
-            {/* Core stroke */}
-            <path
-              d={paths[i]}
-              fill="none"
-              stroke={color}
-              strokeWidth={DM_STROKE.line}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </g>
+          <path
+            key={`line-${i}`}
+            d={paths[i]}
+            fill="none"
+            stroke={color}
+            strokeWidth={DM_STROKE.line}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         );
       })}
 
@@ -490,7 +467,6 @@ const RaceChart: React.FC<{
         const color = DM_PALETTE[i] ?? "#fff";
         return (
           <g key={`dot-${i}`}>
-            <circle cx={e.x} cy={e.y} r={28} fill={color} opacity={0.35} filter="url(#dm-dot-glow)" />
             <circle cx={e.x} cy={e.y} r={11} fill={color} />
           </g>
         );
