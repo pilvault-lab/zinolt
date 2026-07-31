@@ -661,7 +661,7 @@ const Cta: React.FC = () => {
       }}
     >
       <WordStagger
-        text="Comment the next ticker."
+        text="Follow for more market visuals."
         startFrame={0}
         size={TM_SIZES.ctaBody}
         letterSpacing="-0.02em"
