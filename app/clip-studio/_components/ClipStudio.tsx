@@ -33,43 +33,51 @@ const fmtTime = (s: number) => {
   return `${m}:${String(sec).padStart(2, "0")}`;
 };
 
+type ParsedClip = { start: number; end: number; label?: string; caption?: string };
+
 /**
  * Parse the "paste from Claude" text into clip requests. Accepts several
  * shapes; whichever comes back is fine:
- *   12.5-45.2
  *   0:12-0:45
- *   0:12 - 0:45 | opening hook
- *   [{"start":12.5,"end":45.2,"label":"..."}]
+ *   0:12-0:45 | opening hook
+ *   0:12-0:45 | opening hook | NVIDIA CEO on why the next decade belongs to inference
+ *   [{"start":12.5,"end":45.2,"label":"...","caption":"..."}]
  */
-function parseTimestampInput(raw: string): Array<{ start: number; end: number; label?: string }> {
+function parseTimestampInput(raw: string): ParsedClip[] {
   const trimmed = raw.trim();
   if (!trimmed) return [];
   // JSON path
   if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
     try {
-      const j = JSON.parse(trimmed) as Array<{ start?: number; end?: number; label?: string }>;
+      const j = JSON.parse(trimmed) as Array<{
+        start?: number;
+        end?: number;
+        label?: string;
+        caption?: string;
+      }>;
       const arr = Array.isArray(j) ? j : [j];
       return arr
         .filter((c) => typeof c.start === "number" && typeof c.end === "number")
-        .map((c) => ({ start: c.start!, end: c.end!, label: c.label }));
+        .map((c) => ({ start: c.start!, end: c.end!, label: c.label, caption: c.caption }));
     } catch {
       /* fall through to line parser */
     }
   }
-  // Line-based path
-  const out: Array<{ start: number; end: number; label?: string }> = [];
+  // Line-based path — 3 pipe-separated columns: range | label | caption
+  const out: ParsedClip[] = [];
   for (const line of trimmed.split(/\r?\n/)) {
     const cleaned = line.trim();
     if (!cleaned || cleaned.startsWith("#") || cleaned.startsWith("//")) continue;
-    // Split on optional " | " for label.
-    const [range, ...labelParts] = cleaned.split("|").map((s) => s.trim());
+    const parts = cleaned.split("|").map((s) => s.trim());
+    const range = parts[0];
+    const label = parts[1] || undefined;
+    const caption = parts.slice(2).join(" | ").trim() || undefined;
     const m = range.match(/^([\d:.]+)\s*[-–]\s*([\d:.]+)$/);
     if (!m) continue;
     const start = toSeconds(m[1]);
     const end = toSeconds(m[2]);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
-    const label = labelParts.length ? labelParts.join(" | ") : undefined;
-    out.push({ start, end, label });
+    out.push({ start, end, label, caption });
   }
   return out;
 }
@@ -112,7 +120,13 @@ hot takes, quotable one-liners, actionable insights). Prefer stretches
 where multiple ideas land in sequence.
 
 Return ONLY a plain list, one per line, in this exact format:
-mm:ss-mm:ss | short-label
+mm:ss-mm:ss | short-label | social-post-caption
+
+Where:
+- short-label is 2-4 words for internal reference (e.g. "the pivot moment")
+- social-post-caption is a 6-12 word headline suitable for the video overlay
+  and Instagram/TikTok caption (e.g. "NVIDIA CEO on why the next decade
+  belongs to inference"). Punchy, no hashtags, no quotes.
 
 Transcript:
 `;
@@ -130,8 +144,24 @@ export const ClipStudio: React.FC = () => {
 
   const [copied, setCopied] = useState<"" | "prompt" | "transcript">("");
 
+  // Treatment options
+  const [orientation, setOrientation] = useState<"full-bleed" | "letterboxed">("full-bleed");
+  const [burnCaptions, setBurnCaptions] = useState(true);
+
+  // Per-clip headline overrides — keyed by clip index in the current parse.
+  // Reset when the paste text changes.
+  const [headlines, setHeadlines] = useState<Record<number, string>>({});
+
   const intensities = useSegmentIntensities(data?.transcript ?? [], data?.heatmap ?? []);
   const parsedClips = useMemo(() => parseTimestampInput(tsInput), [tsInput]);
+
+  // When the paste changes, reset headline overrides — the caption-derived
+  // defaults recompute automatically from parsedClips[i].caption below.
+  useMemo(() => setHeadlines({}), [tsInput]);
+  const headlineFor = useCallback(
+    (i: number): string => headlines[i] ?? parsedClips[i]?.caption ?? "",
+    [headlines, parsedClips],
+  );
 
   const doFetch = useCallback(async () => {
     setError("");
@@ -163,10 +193,21 @@ export const ClipStudio: React.FC = () => {
     setCutting(true);
     setCutErrors([]);
     try {
+      // Attach the effective headline per clip (only used in letterbox mode
+      // server-side, but always sent so re-cuts can flip modes freely).
+      const clipsWithHeadlines = parsedClips.map((c, i) => ({
+        ...c,
+        headline: headlineFor(i),
+      }));
       const res = await fetch("/api/clip-studio/cut", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ videoId: data.videoId, clips: parsedClips }),
+        body: JSON.stringify({
+          videoId: data.videoId,
+          clips: clipsWithHeadlines,
+          orientation,
+          burnCaptions,
+        }),
       });
       const j = (await res.json()) as { results?: CutResult[]; errors?: typeof cutErrors };
       if (!res.ok) {
@@ -180,7 +221,7 @@ export const ClipStudio: React.FC = () => {
     } finally {
       setCutting(false);
     }
-  }, [data, parsedClips]);
+  }, [data, parsedClips, orientation, burnCaptions, headlineFor]);
 
   const copyToClipboard = useCallback(async (text: string, marker: "prompt" | "transcript") => {
     try {
@@ -277,6 +318,54 @@ export const ClipStudio: React.FC = () => {
                 </Button>
               </div>
 
+              {/* Treatment controls — apply to every cut. */}
+              <div
+                className="flex flex-col gap-2 rounded-md border p-3"
+                style={{ borderColor: BRAND.colors.grey200 }}
+              >
+                <label
+                  className="font-sans text-xs uppercase tracking-wide"
+                  style={{ color: BRAND.colors.grey500 }}
+                >
+                  Orientation
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={orientation === "full-bleed" ? "default" : "outline"}
+                    onClick={() => setOrientation("full-bleed")}
+                    className="flex-1 font-sans text-xs"
+                  >
+                    Full-bleed
+                  </Button>
+                  <Button
+                    variant={orientation === "letterboxed" ? "default" : "outline"}
+                    onClick={() => setOrientation("letterboxed")}
+                    className="flex-1 font-sans text-xs"
+                  >
+                    Letterboxed
+                  </Button>
+                </div>
+                <label
+                  className="mt-1 flex items-center gap-2 font-sans text-xs"
+                  style={{ color: BRAND.colors.ink }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={burnCaptions}
+                    onChange={(e) => setBurnCaptions(e.target.checked)}
+                  />
+                  Burn captions (lower third)
+                </label>
+                <p
+                  className="font-sans text-[11px] leading-snug"
+                  style={{ color: BRAND.colors.grey500 }}
+                >
+                  Output is always 1080×1920 with the Vernavle watermark. In
+                  letterboxed mode, each clip gets a headline pulled from
+                  the Claude caption — edit any of them below before cutting.
+                </p>
+              </div>
+
               <div className="flex flex-col gap-1 max-h-[65vh] overflow-y-auto rounded-md border p-2 font-sans text-xs"
                    style={{ borderColor: BRAND.colors.grey200 }}>
                 {data.transcript.map((seg, i) => {
@@ -344,15 +433,57 @@ export const ClipStudio: React.FC = () => {
           </div>
 
           {parsedClips.length > 0 ? (
-            <div className="flex flex-col gap-1 rounded-md border p-3 font-sans text-xs"
-                 style={{ borderColor: BRAND.colors.grey200, color: BRAND.colors.grey500 }}>
-              <div className="uppercase tracking-wide" style={{ fontSize: 10 }}>Preview</div>
+            <div
+              className="flex flex-col gap-3 rounded-md border p-3 font-sans text-xs"
+              style={{ borderColor: BRAND.colors.grey200 }}
+            >
+              <div
+                className="uppercase tracking-wide"
+                style={{ fontSize: 10, color: BRAND.colors.grey500 }}
+              >
+                Preview ({parsedClips.length})
+              </div>
               {parsedClips.map((c, i) => (
-                <div key={i} className="tabular-nums" style={{ color: BRAND.colors.ink }}>
-                  {i + 1}. {fmtTime(c.start)} – {fmtTime(c.end)}
-                  {" "}
-                  <span style={{ color: BRAND.colors.grey500 }}>({(c.end - c.start).toFixed(1)}s)</span>
-                  {c.label ? <span style={{ color: BRAND.colors.grey500 }}>&nbsp;· {c.label}</span> : null}
+                <div key={i} className="flex flex-col gap-1">
+                  <div
+                    className="tabular-nums"
+                    style={{ color: BRAND.colors.ink }}
+                  >
+                    {i + 1}. {fmtTime(c.start)} – {fmtTime(c.end)}{" "}
+                    <span style={{ color: BRAND.colors.grey500 }}>
+                      ({(c.end - c.start).toFixed(1)}s)
+                    </span>
+                    {c.label ? (
+                      <span style={{ color: BRAND.colors.grey500 }}>
+                        {" "}
+                        · {c.label}
+                      </span>
+                    ) : null}
+                  </div>
+                  {orientation === "letterboxed" ? (
+                    <input
+                      type="text"
+                      value={headlineFor(i)}
+                      onChange={(e) =>
+                        setHeadlines((prev) => ({ ...prev, [i]: e.target.value }))
+                      }
+                      placeholder="Headline for the video overlay"
+                      className="w-full rounded border px-2 py-1 text-[11px]"
+                      style={{
+                        borderColor: BRAND.colors.grey200,
+                        backgroundColor: "#fff",
+                        color: BRAND.colors.ink,
+                      }}
+                      maxLength={100}
+                    />
+                  ) : c.caption ? (
+                    <div
+                      className="text-[11px] leading-snug"
+                      style={{ color: BRAND.colors.grey500 }}
+                    >
+                      Caption: {c.caption}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

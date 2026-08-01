@@ -1,13 +1,25 @@
-import { spawn } from "node:child_process";
-import { mkdir, access } from "node:fs/promises";
+import { mkdir, access, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { clipCacheDir } from "./youtube";
+import { clipCacheDir, type CaptionSegment } from "./youtube";
+import { writeClipAss } from "./captions";
+import {
+  brandAssetPaths,
+  buildTreatmentArgs,
+  runFfmpeg,
+  type Orientation,
+} from "../video-treatment";
 
 export type ClipRequest = {
   start: number;
   end: number;
-  /** Optional short label included in the output filename. */
   label?: string;
+  /** Optional per-clip headline text (letterbox mode only). */
+  headline?: string;
+};
+
+export type CutOptions = {
+  orientation: Orientation;
+  burnCaptions: boolean;
 };
 
 export type CutResult = {
@@ -37,35 +49,61 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
-/**
- * Cut one clip from the cached source video. Fast-seek + re-encode with
- * ultrafast so the cut is frame-accurate but still under a couple seconds
- * per clip. Skips work if the target file already exists.
- */
-function ffmpeg(args: string[]): Promise<{ code: number | null; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const p = spawn("ffmpeg", ["-y", ...args], { windowsHide: true });
-    let stderr = "";
-    p.stderr.on("data", (c) => (stderr += c.toString()));
-    p.on("error", reject);
-    p.on("close", (code) => resolve({ code, stderr }));
-  });
+async function loadTranscript(videoId: string): Promise<CaptionSegment[]> {
+  const dir = clipCacheDir(videoId);
+  const candidates = [
+    join(dir, `${videoId}.en.json3`),
+    join(dir, `${videoId}.en-orig.json3`),
+    join(dir, `${videoId}.en-en.json3`),
+    join(dir, "captions.en.json3"),
+  ];
+  for (const p of candidates) {
+    if (!(await fileExists(p))) continue;
+    try {
+      const raw = JSON.parse(await readFile(p, "utf8")) as {
+        events?: Array<{ tStartMs?: number; dDurationMs?: number; segs?: Array<{ utf8?: string }> }>;
+      };
+      const events = raw.events ?? [];
+      const out: CaptionSegment[] = [];
+      for (const e of events) {
+        const startMs = e.tStartMs;
+        const durMs = e.dDurationMs;
+        if (typeof startMs !== "number" || typeof durMs !== "number") continue;
+        const text = (e.segs ?? [])
+          .map((s) => s.utf8 ?? "")
+          .join("")
+          .replace(/\n+/g, " ")
+          .trim();
+        if (!text) continue;
+        out.push({ start: startMs / 1000, end: (startMs + durMs) / 1000, text });
+      }
+      if (out.length > 0) return out;
+    } catch {
+      /* try next */
+    }
+  }
+  return [];
 }
 
 export async function cutClips(
   videoId: string,
   clips: ClipRequest[],
+  opts: CutOptions,
 ): Promise<{ results: CutResult[]; errors: Array<{ index: number; error: string }> }> {
   const dir = clipCacheDir(videoId);
   const source = join(dir, "video.mp4");
-  const outDir = join(dir, "cuts");
+  // Distinct output directory per (orientation, captions) combination so
+  // switching modes doesn't overwrite previous renders.
+  const modeTag = `${opts.orientation}${opts.burnCaptions ? "-cc" : ""}`;
+  const outDir = join(dir, "cuts", modeTag);
   await mkdir(outDir, { recursive: true });
+
   if (!(await fileExists(source))) {
-    return {
-      results: [],
-      errors: [{ index: -1, error: "source_missing" }],
-    };
+    return { results: [], errors: [{ index: -1, error: "source_missing" }] };
   }
+
+  const brand = brandAssetPaths(join(process.cwd(), "public"));
+  const transcript = opts.burnCaptions ? await loadTranscript(videoId) : [];
 
   const results: CutResult[] = [];
   const errors: Array<{ index: number; error: string }> = [];
@@ -84,21 +122,34 @@ export async function cutClips(
     const outPath = join(outDir, filename);
 
     if (!(await fileExists(outPath))) {
-      // Fast-seek before -i for speed, keep re-encode for accuracy.
-      const res = await ffmpeg([
-        "-ss", c.start.toFixed(3),
-        "-i", source,
-        "-t", duration.toFixed(3),
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "20",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-movflags", "+faststart",
-        outPath,
-      ]);
+      // Write per-clip ASS subtitles when captions are on.
+      let subtitlesAssPath: string | undefined;
+      if (opts.burnCaptions && transcript.length > 0) {
+        subtitlesAssPath = join(outDir, `clip-${String(i + 1).padStart(2, "0")}.ass`);
+        await writeClipAss({
+          transcript,
+          clipStart: c.start,
+          clipEnd: c.end,
+          outputPath: subtitlesAssPath,
+          orientation: opts.orientation,
+        });
+      }
+
+      const args = buildTreatmentArgs({
+        source,
+        output: outPath,
+        orientation: opts.orientation,
+        clipStart: c.start,
+        clipDuration: duration,
+        watermarkPath: brand.watermark,
+        headline: opts.orientation === "letterboxed" ? c.headline : undefined,
+        vernavleTtf: brand.vernavleTtf,
+        subtitlesAssPath,
+        fontsDir: brand.fontsDir,
+      });
+      const res = await runFfmpeg(args);
       if (res.code !== 0 || !(await fileExists(outPath))) {
-        errors.push({ index: i, error: res.stderr.slice(-160) });
+        errors.push({ index: i, error: res.stderr.slice(-200) });
         continue;
       }
     }
@@ -108,7 +159,10 @@ export async function cutClips(
       end: c.end,
       label: c.label,
       filename,
-      url: `/api/clip-studio/download?videoId=${encodeURIComponent(videoId)}&file=${encodeURIComponent(filename)}`,
+      url:
+        `/api/clip-studio/download?videoId=${encodeURIComponent(videoId)}` +
+        `&file=${encodeURIComponent(filename)}` +
+        `&mode=${encodeURIComponent(modeTag)}`,
     });
   }
   return { results, errors };
