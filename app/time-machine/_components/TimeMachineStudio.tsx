@@ -237,9 +237,8 @@ export const TimeMachineStudio: React.FC = () => {
   // stale object URLs. Failures degrade gracefully — no audio, no block.
   useEffect(() => {
     if (!portfolio || !narrationEnabled) {
-      // Revoke any existing URL when narration is toggled off.
+      // Clear any existing hook audio when narration is toggled off.
       if (hookAudioUrl) {
-        URL.revokeObjectURL(hookAudioUrl);
         setHookAudioUrl(null);
         setHookAudioSec(0);
       }
@@ -258,21 +257,26 @@ export const TimeMachineStudio: React.FC = () => {
         if (!res.ok) throw new Error(String(res.status));
         const blob = await res.blob();
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        const rawDur = await measureAudioDuration(url).catch(() => 0);
+        // Convert to a base64 data URL: blob URLs can be invalidated by
+        // React state changes mid-render, and mediabunny is happier with
+        // an inline source that doesn't require an active blob handle.
+        const arrayBuffer = await blob.arrayBuffer();
+        let binary = "";
+        const bytes = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        const dataUrl = `data:audio/mpeg;base64,${btoa(binary)}`;
+        // Measure duration off a throwaway object URL — cheap, works with
+        // HTMLAudioElement's onloadedmetadata.
+        const measurementUrl = URL.createObjectURL(blob);
+        const rawDur = await measureAudioDuration(measurementUrl).catch(() => 0);
+        URL.revokeObjectURL(measurementUrl);
         // Chrome MP3 quirk: some MP3s report Infinity until fully played.
         // Fall back to a byte-rate estimate (96kbps mono).
         const cleanDur = Number.isFinite(rawDur) && rawDur > 0
           ? rawDur
           : (blob.size * 8) / (96 * 1000);
-        if (cancelled) {
-          URL.revokeObjectURL(url);
-          return;
-        }
-        setHookAudioUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return url;
-        });
+        if (cancelled) return;
+        setHookAudioUrl(dataUrl);
         setHookAudioSec(cleanDur);
       } catch {
         if (!cancelled) setNarrationError("Narration unavailable — rendering silent.");
@@ -377,7 +381,8 @@ export const TimeMachineStudio: React.FC = () => {
         muted: !narrationOn,
         audioCodec: narrationOn ? "aac" : null,
         audioBitrate: narrationOn ? "high" : undefined,
-        delayRenderTimeoutInMilliseconds: 60_000,
+        // Bumped to 180s so audio decode + heavy 60fps 30s renders have room.
+        delayRenderTimeoutInMilliseconds: 180_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
       const blob = await getBlob();

@@ -730,12 +730,24 @@ export const TimeMachine: React.FC<TimeMachineProps> = ({
           on export. Hook plays from frame 0; CTA at its (shifted) start. */}
       {hookAudio ? (
         <Sequence from={0} durationInFrames={sec(secs.hook.end)}>
-          <Audio src={hookAudio} volume={1} disallowFallbackToHtml5Audio />
+          <Audio
+            src={hookAudio}
+            volume={1}
+            disallowFallbackToHtml5Audio
+            delayRenderTimeoutInMilliseconds={120_000}
+            delayRenderRetries={3}
+          />
         </Sequence>
       ) : null}
       {ctaAudio ? (
         <Sequence from={sec(secs.cta.start)} durationInFrames={sec(secs.cta.end - secs.cta.start)}>
-          <Audio src={ctaAudio} volume={1} disallowFallbackToHtml5Audio />
+          <Audio
+            src={ctaAudio}
+            volume={1}
+            disallowFallbackToHtml5Audio
+            delayRenderTimeoutInMilliseconds={120_000}
+            delayRenderRetries={3}
+          />
         </Sequence>
       ) : null}
 
