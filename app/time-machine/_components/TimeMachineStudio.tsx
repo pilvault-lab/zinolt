@@ -351,21 +351,8 @@ export const TimeMachineStudio: React.FC = () => {
     setIsRendering(true);
     setProgress(0);
     try {
-      // Match Daily Movers' render pipeline exactly — it's proven fast and
-      // reliable on both desktop and mobile. Narration stays audible in the
-      // Player preview (nice for auditioning) but is stripped from the
-      // exported MP4 so mobile Safari never has to decode + mux audio.
-      // The on-screen CTA text + persistent Vernavle logo are unchanged.
-      const renderTiming = computeTimeMachineTiming(0); // ignore hook audio
-      const totalFrames = renderTiming.totalFrames;
-      const renderInputProps = {
-        ...inputProps,
-        forRender: true,
-        narrationEnabled: false,
-        hookAudioUrl: null,
-        hookDurationSec: 0,
-        ctaAudioUrl: null,
-      };
+      const totalFrames = timing.totalFrames;
+      const narrationOn = narrationEnabled && Boolean(hookAudioUrl);
       const { getBlob } = await renderMediaOnWeb({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         composition: {
@@ -384,15 +371,18 @@ export const TimeMachineStudio: React.FC = () => {
           }),
         } as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        inputProps: renderInputProps as any,
+        inputProps: { ...inputProps, forRender: true } as any,
         licenseKey: "free-license",
         videoCodec: "h264",
         videoBitrate: "very-high",
         hardwareAcceleration: "prefer-hardware",
         keyframeIntervalInSeconds: 4,
-        muted: true,
-        audioCodec: null,
-        delayRenderTimeoutInMilliseconds: 60_000,
+        // Audio: mux with AAC when narration is on (hook + static CTA).
+        muted: !narrationOn,
+        audioCodec: narrationOn ? "aac" : null,
+        audioBitrate: narrationOn ? "high" : undefined,
+        // Longer timeout since audio decode + heavy 60fps 30s renders need it.
+        delayRenderTimeoutInMilliseconds: 180_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
       const blob = await getBlob();
