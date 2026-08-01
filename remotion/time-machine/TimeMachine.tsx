@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 import {
   AbsoluteFill,
-  Audio,
   Img,
   interpolate,
   spring,
@@ -12,6 +11,11 @@ import {
   delayRender,
   continueRender,
 } from "remotion";
+// Audio from @remotion/media uses the mediabunny decoder which
+// @remotion/web-renderer supports for muxing. `remotion`'s built-in
+// <Audio> falls back to Html5Audio at render time, which the web
+// renderer rejects with 'Html5Audio is not supported'.
+import { Audio } from "@remotion/media";
 import type { PortfolioResult } from "@/lib/time-machine/portfolio";
 import {
   TM_FPS,
@@ -726,12 +730,12 @@ export const TimeMachine: React.FC<TimeMachineProps> = ({
           on export. Hook plays from frame 0; CTA at its (shifted) start. */}
       {hookAudio ? (
         <Sequence from={0} durationInFrames={sec(secs.hook.end)}>
-          <Audio src={hookAudio} volume={1} />
+          <Audio src={hookAudio} volume={1} disallowFallbackToHtml5Audio />
         </Sequence>
       ) : null}
       {ctaAudio ? (
         <Sequence from={sec(secs.cta.start)} durationInFrames={sec(secs.cta.end - secs.cta.start)}>
-          <Audio src={ctaAudio} volume={1} />
+          <Audio src={ctaAudio} volume={1} disallowFallbackToHtml5Audio />
         </Sequence>
       ) : null}
 
