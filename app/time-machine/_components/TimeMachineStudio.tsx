@@ -81,42 +81,51 @@ function slugify(s: string, max: number): string {
   );
 }
 
-/** Try Web Share Level 2 (files) — used on iOS/Android so the video lands
- *  in Photos. Fall back to a blob download for desktop. */
-async function saveOrShare(blob: Blob, filename: string) {
-  // renderMediaOnWeb's blob may not carry an explicit MIME type. On iOS
-  // Safari, a typed-as-empty blob (or one accidentally tagged audio/*)
-  // opens in an inline HTML5 media player showing just the audio track
-  // instead of routing to the Share Sheet as a video. Re-wrap with
-  // explicit video/mp4 so both Share and anchor-download see a video.
+/** Coerce the render's blob to an explicitly-typed video/mp4 blob and
+ *  expose a stable object URL. Caller is responsible for revoking. */
+function makeVideoUrl(blob: Blob): { url: string; videoBlob: Blob } {
   const videoBlob =
     blob.type === "video/mp4"
       ? blob
       : new Blob([blob], { type: "video/mp4" });
+  return { url: URL.createObjectURL(videoBlob), videoBlob };
+}
+
+/** Try the Web Share Sheet; fall back to anchor download. Return whether
+ *  the caller should also expose the video inline for a manual save
+ *  (iOS pattern: long-press the <video> and choose "Save Video"). */
+async function trySaveOrShare(
+  videoBlob: Blob,
+  url: string,
+  filename: string,
+): Promise<{ shared: boolean }> {
   const file = new File([videoBlob], filename, { type: "video/mp4" });
   const nav = navigator as Navigator & {
     canShare?: (data: { files: File[] }) => boolean;
     share?: (data: { files: File[]; title?: string }) => Promise<void>;
   };
-  if (
-    nav.canShare?.({ files: [file] }) &&
-    typeof nav.share === "function"
-  ) {
+  // Try share() even when canShare isn't around — canShare on some iOS
+  // versions returns false for files it can actually share.
+  if (typeof nav.share === "function") {
     try {
-      await nav.share({ files: [file], title: "Time Machine" });
-      return;
+      if (!nav.canShare || nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: "Time Machine" });
+        return { shared: true };
+      }
     } catch {
-      // user cancelled or share failed — fall through to download
+      /* user cancelled or share failed — fall through */
     }
   }
-  const url = URL.createObjectURL(videoBlob);
+  // Desktop path: anchor download. iOS ignores the download attribute
+  // (opens the blob URL inline instead) — the inline <video> element the
+  // caller renders is the save path there.
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  return { shared: false };
 }
 
 export const TimeMachineStudio: React.FC = () => {
@@ -141,6 +150,15 @@ export const TimeMachineStudio: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [canExport, setCanExport] = useState<boolean | null>(null);
   const [exportError, setExportError] = useState("");
+  const [renderedVideo, setRenderedVideo] = useState<{ url: string; name: string } | null>(null);
+
+  // Revoke the previous object URL when a new render replaces it, and on unmount.
+  useEffect(() => {
+    return () => {
+      if (renderedVideo?.url) URL.revokeObjectURL(renderedVideo.url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renderedVideo]);
 
   // Pre-flight the browser's ability to render mp4/h264 at 1080x1920.
   useEffect(() => {
@@ -364,7 +382,14 @@ export const TimeMachineStudio: React.FC = () => {
       });
       const blob = await getBlob();
       const filename = `${activeSymbol}_${portfolio.year}_${amount}.mp4`;
-      await saveOrShare(blob, filename);
+      const { url, videoBlob } = makeVideoUrl(blob);
+      // Show the video inline immediately — this is the reliable iOS save
+      // path (long-press → Save Video) when Share isn't available.
+      setRenderedVideo((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
+        return { url, name: filename };
+      });
+      await trySaveOrShare(videoBlob, url, filename);
     } catch (err) {
       console.error(err);
       const msg = err instanceof Error ? err.message : String(err);
@@ -706,6 +731,37 @@ export const TimeMachineStudio: React.FC = () => {
             >
               {exportError}
             </p>
+          ) : null}
+
+          {/* Rendered video — always shown after a successful render. On
+              iOS, this is the reliable save path: long-press → Save Video.
+              Also gives desktop users a preview of the exported file. */}
+          {renderedVideo ? (
+            <div className="mt-4 flex flex-col gap-2">
+              <video
+                key={renderedVideo.url}
+                src={renderedVideo.url}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full rounded-md"
+                style={{ backgroundColor: "#000", aspectRatio: "9 / 16" }}
+              />
+              <p
+                className="font-sans text-[11px] leading-snug"
+                style={{ color: BRAND.colors.grey500 }}
+              >
+                On iPhone: tap and hold the video, then choose <b>Save Video</b>.
+              </p>
+              <a
+                href={renderedVideo.url}
+                download={renderedVideo.name}
+                className="font-sans text-xs underline"
+                style={{ color: BRAND.colors.ink }}
+              >
+                Or download again
+              </a>
+            </div>
           ) : null}
         </aside>
       </div>
