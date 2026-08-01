@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
-import { Source_Serif_4, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { DevConsoleFilter } from "./_components/DevConsoleFilter";
 
-// Display serif retained for marketing-stage editorial headlines.
-const sourceSerif = Source_Serif_4({
-  variable: "--font-display",
-  subsets: ["latin"],
+// Vernavle is Zinolt's brand face — used across the whole UI (headlines,
+// nav, buttons, labels, body). Assigned to BOTH --font-ui and --font-display
+// so every existing design-system token that references either variable
+// resolves to Vernavle without further changes.
+const vernavle = localFont({
+  src: "../public/brand/vernavle-font.woff2",
   display: "swap",
-});
-
-// Inter is the new UI workhorse — nav, buttons, labels, body copy.
-const inter = Inter({
   variable: "--font-ui",
-  subsets: ["latin"],
-  display: "swap",
-  axes: ["opsz"],
 });
 
 export const metadata: Metadata = {
@@ -31,7 +26,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sourceSerif.variable} ${inter.variable} h-full antialiased`}
+      className={`${vernavle.variable} h-full antialiased`}
+      style={{ ["--font-display" as string]: "var(--font-ui)" }}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <DevConsoleFilter />
