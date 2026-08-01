@@ -14,7 +14,7 @@ export const DM_DUR = {
   race: 15.0,     // chart draws + leaderboard reshuffles
   hold: 0.5,      // freeze — no stamp, just a beat
   reflow: 1.5,    // vertical stack → horizontal strip (staggered springs)
-  rest: 3.0,      // strip fully settled + names readable, chart still bright
+  rest: 1.5,      // strip fully settled + names readable, chart still bright
   cta: 3.0,       // dim chart + strip, "Follow @vernavle" springs in
 } as const;
 
