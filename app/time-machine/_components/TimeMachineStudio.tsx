@@ -84,7 +84,16 @@ function slugify(s: string, max: number): string {
 /** Try Web Share Level 2 (files) — used on iOS/Android so the video lands
  *  in Photos. Fall back to a blob download for desktop. */
 async function saveOrShare(blob: Blob, filename: string) {
-  const file = new File([blob], filename, { type: "video/mp4" });
+  // renderMediaOnWeb's blob may not carry an explicit MIME type. On iOS
+  // Safari, a typed-as-empty blob (or one accidentally tagged audio/*)
+  // opens in an inline HTML5 media player showing just the audio track
+  // instead of routing to the Share Sheet as a video. Re-wrap with
+  // explicit video/mp4 so both Share and anchor-download see a video.
+  const videoBlob =
+    blob.type === "video/mp4"
+      ? blob
+      : new Blob([blob], { type: "video/mp4" });
+  const file = new File([videoBlob], filename, { type: "video/mp4" });
   const nav = navigator as Navigator & {
     canShare?: (data: { files: File[] }) => boolean;
     share?: (data: { files: File[]; title?: string }) => Promise<void>;
@@ -100,7 +109,7 @@ async function saveOrShare(blob: Blob, filename: string) {
       // user cancelled or share failed — fall through to download
     }
   }
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(videoBlob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
