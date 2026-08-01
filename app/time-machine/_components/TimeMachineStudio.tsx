@@ -353,6 +353,17 @@ export const TimeMachineStudio: React.FC = () => {
     try {
       const totalFrames = timing.totalFrames;
       const narrationOn = narrationEnabled && Boolean(hookAudioUrl);
+      // Mobile detection: UA, coarse pointer, or narrow viewport.
+      const isMobile =
+        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        window.matchMedia?.("(pointer: coarse)")?.matches === true ||
+        window.innerWidth < 768;
+      // On mobile: render at 720x1280 (scale 0.667) so iOS Safari has
+      // enough headroom to finish without crashing the tab. Quality is
+      // still very good — 720p vertical is the tier IG/TikTok upload
+      // pipelines routinely re-encode to. Desktop: full 1080p.
+      const renderScale = isMobile ? 2 / 3 : 1;
+      const chosenVideoBitrate = isMobile ? "high" : "very-high";
       const { getBlob } = await renderMediaOnWeb({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         composition: {
@@ -374,14 +385,15 @@ export const TimeMachineStudio: React.FC = () => {
         inputProps: { ...inputProps, forRender: true } as any,
         licenseKey: "free-license",
         videoCodec: "h264",
-        videoBitrate: "very-high",
+        videoBitrate: chosenVideoBitrate,
+        scale: renderScale,
         hardwareAcceleration: "prefer-hardware",
         keyframeIntervalInSeconds: 4,
         // Audio: mux with AAC when narration is on (hook + static CTA).
         muted: !narrationOn,
         audioCodec: narrationOn ? "aac" : null,
         audioBitrate: narrationOn ? "high" : undefined,
-        // Bumped to 180s so audio decode + heavy 60fps 30s renders have room.
+        // 180s handle timeout — audio decode + heavy 60fps 30s renders need it.
         delayRenderTimeoutInMilliseconds: 180_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
