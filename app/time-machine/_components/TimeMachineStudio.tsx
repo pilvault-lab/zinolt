@@ -351,19 +351,21 @@ export const TimeMachineStudio: React.FC = () => {
     setIsRendering(true);
     setProgress(0);
     try {
-      const totalFrames = timing.totalFrames;
-      const narrationOn = narrationEnabled && Boolean(hookAudioUrl);
-      // Mobile detection: UA, coarse pointer, or narrow viewport.
-      const isMobile =
-        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        window.matchMedia?.("(pointer: coarse)")?.matches === true ||
-        window.innerWidth < 768;
-      // On mobile: render at 720x1280 (scale 0.667) so iOS Safari has
-      // enough headroom to finish without crashing the tab. Quality is
-      // still very good — 720p vertical is the tier IG/TikTok upload
-      // pipelines routinely re-encode to. Desktop: full 1080p.
-      const renderScale = isMobile ? 2 / 3 : 1;
-      const chosenVideoBitrate = isMobile ? "high" : "very-high";
+      // Match Daily Movers' render pipeline exactly — it's proven fast and
+      // reliable on both desktop and mobile. Narration stays audible in the
+      // Player preview (nice for auditioning) but is stripped from the
+      // exported MP4 so mobile Safari never has to decode + mux audio.
+      // The on-screen CTA text + persistent Vernavle logo are unchanged.
+      const renderTiming = computeTimeMachineTiming(0); // ignore hook audio
+      const totalFrames = renderTiming.totalFrames;
+      const renderInputProps = {
+        ...inputProps,
+        forRender: true,
+        narrationEnabled: false,
+        hookAudioUrl: null,
+        hookDurationSec: 0,
+        ctaAudioUrl: null,
+      };
       const { getBlob } = await renderMediaOnWeb({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         composition: {
@@ -382,19 +384,15 @@ export const TimeMachineStudio: React.FC = () => {
           }),
         } as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        inputProps: { ...inputProps, forRender: true } as any,
+        inputProps: renderInputProps as any,
         licenseKey: "free-license",
         videoCodec: "h264",
-        videoBitrate: chosenVideoBitrate,
-        scale: renderScale,
+        videoBitrate: "very-high",
         hardwareAcceleration: "prefer-hardware",
         keyframeIntervalInSeconds: 4,
-        // Audio: mux with AAC when narration is on (hook + static CTA).
-        muted: !narrationOn,
-        audioCodec: narrationOn ? "aac" : null,
-        audioBitrate: narrationOn ? "high" : undefined,
-        // 180s handle timeout — audio decode + heavy 60fps 30s renders need it.
-        delayRenderTimeoutInMilliseconds: 180_000,
+        muted: true,
+        audioCodec: null,
+        delayRenderTimeoutInMilliseconds: 60_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
       const blob = await getBlob();
