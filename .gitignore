@@ -62,3 +62,6 @@ next-env.d.ts
 .gstack/
 
 .env*.local
+
+# Clip Studio cache (downloaded YouTube videos + cuts)
+.clip-studio-cache/
