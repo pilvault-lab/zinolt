@@ -70,7 +70,7 @@ const HEADLINE = {
    *  Headline block's BOTTOM sits just above this, gap px away. */
   VIDEO_TOP_Y: 656,
   /** Pixels between the headline's bottom edge and the video panel top. */
-  BOTTOM_GAP: 12,
+  BOTTOM_GAP: 2,
   /** Line-height as a factor of font size. */
   LINE_HEIGHT: 1.15,
 } as const;
