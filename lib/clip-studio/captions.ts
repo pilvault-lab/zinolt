@@ -298,11 +298,25 @@ ${style}
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
+  // Two-layer emit per group so the shadow is blurred but the primary
+  // text stays CRISP:
+  //   Layer 0 = invisible primary (\1a&HFF&) + heavy blurred shadow
+  //   Layer 1 = white text on top with no shadow, no blur
   const events = groups
-    .map((g) => {
+    .flatMap((g) => {
       const fs = fontsizeFor(g.text);
-      const overrides = `{\\pos(${x},${y})\\fs${fs}\\blur${C.SHADOW_BLUR}}`;
-      return `Dialogue: 0,${assTime(g.start)},${assTime(g.end)},Cap,,0,0,0,,${overrides}${assEscape(g.text)}`;
+      const escaped = assEscape(g.text);
+      const start = assTime(g.start);
+      const end = assTime(g.end);
+      const shadowLine =
+        `Dialogue: 0,${start},${end},Cap,,0,0,0,,` +
+        `{\\pos(${x},${y})\\fs${fs}\\1a&HFF&\\shad${C.SHADOW_PX}\\blur${C.SHADOW_BLUR}}` +
+        escaped;
+      const textLine =
+        `Dialogue: 1,${start},${end},Cap,,0,0,0,,` +
+        `{\\pos(${x},${y})\\fs${fs}\\shad0\\blur0}` +
+        escaped;
+      return [shadowLine, textLine];
     })
     .join("\n");
 

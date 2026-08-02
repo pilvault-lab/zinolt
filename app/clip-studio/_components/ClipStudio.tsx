@@ -146,7 +146,7 @@ export const ClipStudio: React.FC = () => {
 
   // Treatment options
   const [orientation, setOrientation] = useState<"full-bleed" | "letterboxed">("full-bleed");
-  const [burnCaptions, setBurnCaptions] = useState(true);
+  const [burnCaptions, setBurnCaptions] = useState(false);
 
   // Per-clip headline overrides — keyed by clip index in the current parse.
   // Reset when the paste text changes.

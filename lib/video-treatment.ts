@@ -21,7 +21,9 @@ export type TreatmentOptions = {
   clipDuration: number;
   /** Vernavle logo overlay path (public path resolved to disk). */
   watermarkPath: string;
-  /** Only rendered when orientation === 'letterboxed'. */
+  /** Only rendered when orientation === 'letterboxed'. Ignored by
+   *  buildTreatmentArgs — caller pre-fits + writes a textfile and
+   *  passes headlineTextfilePath below. */
   headline?: string;
   /** Absolute path to Vernavle TTF (for drawtext + subtitles). */
   vernavleTtf: string;
@@ -29,6 +31,13 @@ export type TreatmentOptions = {
   subtitlesAssPath?: string;
   /** Directory containing font files for libass. */
   fontsDir: string;
+  /** Pre-fit headline text file (contents = final wrapped lines). Used
+   *  via drawtext textfile= so apostrophes / colons / commas in headlines
+   *  never break the filter graph. */
+  headlineTextfilePath?: string;
+  headlineFontsize?: number;
+  /** Number of lines the headline was wrapped into (1 or 2). */
+  headlineLineCount?: number;
 };
 
 const OUT_W = 1080;
@@ -68,7 +77,7 @@ const HEADLINE = {
 
 /** Greedy wrap + auto-shrink. Returns lines (never exceeds MAX_LINES) plus
  *  the fontsize that fits. Falls back to FONTSIZE_MIN if nothing fits. */
-function fitHeadline(text: string): { lines: string[]; fontsize: number } {
+export function fitHeadline(text: string): { lines: string[]; fontsize: number } {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return { lines: [], fontsize: HEADLINE.FONTSIZE_START };
   const maxWidthPx = OUT_W * HEADLINE.WIDTH_FRAC;
@@ -176,21 +185,24 @@ export function buildTreatmentArgs(opts: TreatmentOptions): string[] {
   // in the black band between the frame top (y=0) and video panel top
   // (y≈656). Rendered as one drawtext per line with y computed from
   // text_h so the line block is precisely centered on HEADLINE.Y_CENTER.
-  if (orientation === "letterboxed" && headline && headline.trim().length > 0) {
+  if (
+    orientation === "letterboxed" &&
+    opts.headlineTextfilePath &&
+    opts.headlineFontsize &&
+    opts.headlineLineCount &&
+    opts.headlineLineCount > 0
+  ) {
     const fontFile = escapePathForFilter(vernavleTtf);
-    const { lines, fontsize } = fitHeadline(headline);
+    const textfile = escapePathForFilter(opts.headlineTextfilePath);
+    const fontsize = opts.headlineFontsize;
     const lineHeightPx = Math.round(fontsize * HEADLINE.LINE_HEIGHT);
-    // Anchor the headline BLOCK by its bottom edge, sitting BOTTOM_GAP px
-    // above the video panel top. That guarantees a tight, consistent gap
-    // regardless of 1 vs 2 lines (no more huge black space between headline
-    // and video).
+    // Anchor block's bottom edge BOTTOM_GAP px above the video panel top.
     const bottomAnchor = HEADLINE.VIDEO_TOP_Y - HEADLINE.BOTTOM_GAP;
 
-    if (lines.length === 1) {
-      const text = escapeDrawText(lines[0]);
+    if (opts.headlineLineCount === 1) {
       chain.push(
         `[${currentLabel}]drawtext=fontfile='${fontFile}'` +
-          `:text='${text}'` +
+          `:textfile='${textfile}'` +
           `:fontsize=${fontsize}` +
           `:fontcolor=white` +
           `:text_shaping=1` +
@@ -200,21 +212,25 @@ export function buildTreatmentArgs(opts: TreatmentOptions): string[] {
       );
       currentLabel = "final";
     } else {
-      // Two lines: last (line 2) sits at bottomAnchor - text_h;
-      // line 1 sits one lineHeightPx above line 2.
-      const t1 = escapeDrawText(lines[0]);
-      const t2 = escapeDrawText(lines[1]);
+      // 2-line file: drawtext reads both lines from the file, aligns to a
+      // single top-left. Anchor block's bottom via text_h (which is total
+      // height of both lines).
       chain.push(
         `[${currentLabel}]drawtext=fontfile='${fontFile}'` +
-          `:text='${t1}':fontsize=${fontsize}:fontcolor=white:text_shaping=1:borderw=0` +
-          `:x=(w-text_w)/2:y=${bottomAnchor - lineHeightPx}-text_h[hd1]`,
-        `[hd1]drawtext=fontfile='${fontFile}'` +
-          `:text='${t2}':fontsize=${fontsize}:fontcolor=white:text_shaping=1:borderw=0` +
-          `:x=(w-text_w)/2:y=${bottomAnchor}-text_h[final]`,
+          `:textfile='${textfile}'` +
+          `:fontsize=${fontsize}` +
+          `:fontcolor=white` +
+          `:text_shaping=1` +
+          `:borderw=0` +
+          `:line_spacing=${Math.max(0, lineHeightPx - fontsize)}` +
+          `:x=(w-text_w)/2` +
+          `:y=${bottomAnchor}-text_h[final]`,
       );
       currentLabel = "final";
     }
   }
+
+  void headline; // silence unused warning while we prefer the textfile path
 
   const filterGraph = chain.join(";");
 

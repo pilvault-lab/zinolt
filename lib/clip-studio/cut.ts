@@ -1,10 +1,11 @@
-import { mkdir, access, readFile } from "node:fs/promises";
+import { mkdir, access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { clipCacheDir, type CaptionSegment } from "./youtube";
 import { writeClipAss } from "./captions";
 import {
   brandAssetPaths,
   buildTreatmentArgs,
+  fitHeadline,
   runFfmpeg,
   type Orientation,
 } from "../video-treatment";
@@ -127,12 +128,29 @@ export async function cutClips(
       if (opts.burnCaptions && transcript.length > 0) {
         subtitlesAssPath = join(outDir, `clip-${String(i + 1).padStart(2, "0")}.ass`);
         await writeClipAss({
-          transcript,
+          videoId,           // enables word-level chunking from the json3 cache
+          transcript,        // fallback if json3 lookup is empty
           clipStart: c.start,
           clipEnd: c.end,
           outputPath: subtitlesAssPath,
           orientation: opts.orientation,
         });
+      }
+
+      // Letterbox headline: pre-fit + write a textfile so drawtext can
+      // pull the (possibly apostrophe-laden) text without escape hell.
+      let headlineTextfilePath: string | undefined;
+      let headlineFontsize: number | undefined;
+      let headlineLineCount: number | undefined;
+      if (opts.orientation === "letterboxed" && c.headline && c.headline.trim()) {
+        const fit = fitHeadline(c.headline);
+        headlineFontsize = fit.fontsize;
+        headlineLineCount = fit.lines.length;
+        headlineTextfilePath = join(
+          outDir,
+          `clip-${String(i + 1).padStart(2, "0")}.headline.txt`,
+        );
+        await writeFile(headlineTextfilePath, fit.lines.join("\n"), "utf8");
       }
 
       const args = buildTreatmentArgs({
@@ -146,6 +164,9 @@ export async function cutClips(
         vernavleTtf: brand.vernavleTtf,
         subtitlesAssPath,
         fontsDir: brand.fontsDir,
+        headlineTextfilePath,
+        headlineFontsize,
+        headlineLineCount,
       });
       const res = await runFfmpeg(args);
       if (res.code !== 0 || !(await fileExists(outPath))) {
