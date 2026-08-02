@@ -233,6 +233,22 @@ export async function writeClipAss(opts: CaptionAssOptions): Promise<void> {
 
   const groups = chunkWords(inWindow);
 
+  // Enforce STRICT non-overlap between consecutive groups. libass draws
+  // any Dialogue whose window contains the current frame — two groups
+  // sharing an exact boundary can render simultaneously on a boundary
+  // frame, which is the ghosting bug. Clamp each group's end to just
+  // before the next group's start.
+  const EPS = 0.02;
+  for (let i = 0; i < groups.length - 1; i++) {
+    const cap = groups[i + 1].start - EPS;
+    if (groups[i].end > cap) groups[i].end = cap;
+    // If the group would be non-positive after clamping, drop it —
+    // means the source words overlapped past the next group entirely.
+    if (groups[i].end <= groups[i].start) {
+      groups[i].end = groups[i].start + EPS;
+    }
+  }
+
   const yFrac =
     orientation === "full-bleed" ? C.FULLBLEED_Y_FRAC : C.LETTERBOXED_Y_FRAC;
   const x = Math.round(PLAY_RES_X * C.X_CENTER_FRAC);

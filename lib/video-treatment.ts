@@ -46,6 +46,63 @@ const WATERMARK_MARGIN_RIGHT = 60;
 // captions.
 const LETTERBOX_VIDEO_W = OUT_W;
 
+/** Headline (letterbox mode) — layout knobs. */
+const HEADLINE = {
+  /** Max width as a fraction of frame width. */
+  WIDTH_FRAC: 0.88,
+  /** Starting font size; shrink towards MIN if the text still overflows. */
+  FONTSIZE_START: 62,
+  FONTSIZE_MIN: 34,
+  /** Max wrapped lines. */
+  MAX_LINES: 2,
+  /** Rough Vernavle glyph width as a fraction of em (matches captions estimate). */
+  AVG_GLYPH_WIDTH_EM: 0.5,
+  /** Video panel top edge — where the letterboxed source starts.
+   *  Headline block's BOTTOM sits just above this, gap px away. */
+  VIDEO_TOP_Y: 656,
+  /** Pixels between the headline's bottom edge and the video panel top. */
+  BOTTOM_GAP: 12,
+  /** Line-height as a factor of font size. */
+  LINE_HEIGHT: 1.15,
+} as const;
+
+/** Greedy wrap + auto-shrink. Returns lines (never exceeds MAX_LINES) plus
+ *  the fontsize that fits. Falls back to FONTSIZE_MIN if nothing fits. */
+function fitHeadline(text: string): { lines: string[]; fontsize: number } {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return { lines: [], fontsize: HEADLINE.FONTSIZE_START };
+  const maxWidthPx = OUT_W * HEADLINE.WIDTH_FRAC;
+
+  const wrapAt = (fs: number): string[] | null => {
+    const maxChars = Math.floor(maxWidthPx / (fs * HEADLINE.AVG_GLYPH_WIDTH_EM));
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      // A single word longer than maxChars can't fit even alone — force it on its own line;
+      // outer loop will detect the shrink need.
+      const test = cur ? cur + " " + w : w;
+      if (test.length <= maxChars) {
+        cur = test;
+      } else {
+        if (cur) lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+    if (lines.length > HEADLINE.MAX_LINES) return null;
+    if (lines.some((l) => l.length > maxChars)) return null;
+    return lines;
+  };
+
+  for (let fs = HEADLINE.FONTSIZE_START; fs >= HEADLINE.FONTSIZE_MIN; fs -= 2) {
+    const lines = wrapAt(fs);
+    if (lines) return { lines, fontsize: fs };
+  }
+  // Last-resort: force fit at MIN, may still overflow but centered.
+  const fs = HEADLINE.FONTSIZE_MIN;
+  return { lines: wrapAt(fs) ?? [text.slice(0, 60)], fontsize: fs };
+}
+
 /** Escape a string for ffmpeg's `drawtext` filter text= value. */
 function escapeDrawText(s: string): string {
   // Order matters: escape backslashes first.
@@ -115,23 +172,48 @@ export function buildTreatmentArgs(opts: TreatmentOptions): string[] {
   currentLabel = "wmed";
 
   // Headline drawtext (letterbox only, above the video block).
+  // Wrapped to ≤2 lines at ≤88% frame width, auto-shrunk font, centered
+  // in the black band between the frame top (y=0) and video panel top
+  // (y≈656). Rendered as one drawtext per line with y computed from
+  // text_h so the line block is precisely centered on HEADLINE.Y_CENTER.
   if (orientation === "letterboxed" && headline && headline.trim().length > 0) {
-    // Position: horizontally centered, vertically at ~y=300 (above the
-    // letterboxed video which starts at y=(1920-608)/2 ≈ 656).
-    // fontsize scales down for long lines via boxborderw/text_shaping.
     const fontFile = escapePathForFilter(vernavleTtf);
-    const text = escapeDrawText(headline.trim());
-    chain.push(
-      `[${currentLabel}]drawtext=fontfile='${fontFile}'` +
-        `:text='${text}'` +
-        `:fontsize=54` +
-        `:fontcolor=white` +
-        `:line_spacing=8` +
-        `:borderw=0` +
-        `:x=(w-text_w)/2` +
-        `:y=320[final]`,
-    );
-    currentLabel = "final";
+    const { lines, fontsize } = fitHeadline(headline);
+    const lineHeightPx = Math.round(fontsize * HEADLINE.LINE_HEIGHT);
+    // Anchor the headline BLOCK by its bottom edge, sitting BOTTOM_GAP px
+    // above the video panel top. That guarantees a tight, consistent gap
+    // regardless of 1 vs 2 lines (no more huge black space between headline
+    // and video).
+    const bottomAnchor = HEADLINE.VIDEO_TOP_Y - HEADLINE.BOTTOM_GAP;
+
+    if (lines.length === 1) {
+      const text = escapeDrawText(lines[0]);
+      chain.push(
+        `[${currentLabel}]drawtext=fontfile='${fontFile}'` +
+          `:text='${text}'` +
+          `:fontsize=${fontsize}` +
+          `:fontcolor=white` +
+          `:text_shaping=1` +
+          `:borderw=0` +
+          `:x=(w-text_w)/2` +
+          `:y=${bottomAnchor}-text_h[final]`,
+      );
+      currentLabel = "final";
+    } else {
+      // Two lines: last (line 2) sits at bottomAnchor - text_h;
+      // line 1 sits one lineHeightPx above line 2.
+      const t1 = escapeDrawText(lines[0]);
+      const t2 = escapeDrawText(lines[1]);
+      chain.push(
+        `[${currentLabel}]drawtext=fontfile='${fontFile}'` +
+          `:text='${t1}':fontsize=${fontsize}:fontcolor=white:text_shaping=1:borderw=0` +
+          `:x=(w-text_w)/2:y=${bottomAnchor - lineHeightPx}-text_h[hd1]`,
+        `[hd1]drawtext=fontfile='${fontFile}'` +
+          `:text='${t2}':fontsize=${fontsize}:fontcolor=white:text_shaping=1:borderw=0` +
+          `:x=(w-text_w)/2:y=${bottomAnchor}-text_h[final]`,
+      );
+      currentLabel = "final";
+    }
   }
 
   const filterGraph = chain.join(";");
