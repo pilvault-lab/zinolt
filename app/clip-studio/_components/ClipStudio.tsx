@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
@@ -143,6 +143,8 @@ export const ClipStudio: React.FC = () => {
   const [cutErrors, setCutErrors] = useState<Array<{ index: number; error: string }>>([]);
 
   const [copied, setCopied] = useState<"" | "prompt" | "transcript">("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Treatment options
   const [orientation, setOrientation] = useState<"full-bleed" | "letterboxed">("full-bleed");
@@ -232,6 +234,13 @@ export const ClipStudio: React.FC = () => {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (!previewUrl) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPreviewUrl(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [previewUrl]);
 
   const transcriptText = useMemo(
     () => (data ? buildTranscriptText(data.transcript) : ""),
@@ -503,14 +512,23 @@ export const ClipStudio: React.FC = () => {
                       {i + 1}. {fmtTime(c.start)}–{fmtTime(c.end)}
                       {c.label ? <span style={{ color: BRAND.colors.grey500 }}>&nbsp;· {c.label}</span> : null}
                     </span>
-                    <a
-                      href={c.url}
-                      download
-                      className="underline font-sans text-xs"
-                      style={{ color: BRAND.colors.ink }}
-                    >
-                      Download
-                    </a>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => setPreviewUrl(c.url)}
+                        className="underline font-sans text-xs"
+                        style={{ color: BRAND.colors.grey500 }}
+                      >
+                        Preview
+                      </button>
+                      <a
+                        href={c.url}
+                        download
+                        className="underline font-sans text-xs"
+                        style={{ color: BRAND.colors.ink }}
+                      >
+                        Download
+                      </a>
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -530,6 +548,29 @@ export const ClipStudio: React.FC = () => {
           ) : null}
         </main>
       </div>
+
+      {/* Video preview modal */}
+      {previewUrl ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+          onClick={() => setPreviewUrl(null)}
+        >
+          <video
+            ref={videoRef}
+            src={previewUrl}
+            autoPlay
+            controls
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxHeight: "90vh",
+              maxWidth: "90vw",
+              borderRadius: 8,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+            }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 };
