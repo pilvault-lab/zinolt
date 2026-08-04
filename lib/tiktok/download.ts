@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, access } from "node:fs/promises";
+import { mkdir, access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cookieArgs } from "../ytdlp-cookies";
 import { brandAssetPaths, buildTreatmentArgs, runFfmpeg } from "../video-treatment";
@@ -30,22 +30,34 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
+/** Extract video ID from a canonical TikTok URL (@user/video/ID). */
+function videoIdFromUrl(url: string): string | null {
+  const m = url.match(/\/video\/(\d+)/);
+  return m ? m[1] : null;
+}
+
 export type TikTokResult = {
   videoId: string;
   title: string;
   filename: string;
 };
 
-/** Resolve tiktok.com/t/ short links to their canonical @user/video/ URL.
- *  yt-dlp's TikTok extractor doesn't recognise the /t/ format so it falls
- *  back to the generic extractor and fails. Following the redirect first gives
- *  us the URL the extractor actually expects. */
+/** Resolve tiktok.com/t/ short links to their canonical @user/video/ URL. */
 async function resolveUrl(url: string): Promise<string> {
   try {
     const res = await fetch(url, { method: "HEAD", redirect: "follow" });
     return res.url || url;
   } catch {
     return url;
+  }
+}
+
+async function readTitle(dir: string, fallback: string): Promise<string> {
+  try {
+    const info = JSON.parse(await readFile(join(dir, "info.json"), "utf8")) as { title?: string };
+    return info.title ?? fallback;
+  } catch {
+    return fallback;
   }
 }
 
@@ -60,14 +72,24 @@ export async function downloadTikTok(
     return { error: "This is a TikTok photo post — only video posts can be downloaded." };
   }
 
-  // Step 1: info JSON — extracts real video ID and duration regardless of
-  // URL format (@user/video/, vm.tiktok.com/, etc.).
+  // Fast path: if we already have the branded output, return immediately —
+  // no yt-dlp network call needed.
+  const maybeId = videoIdFromUrl(url);
+  if (maybeId) {
+    const dir = join(CACHE_ROOT, maybeId);
+    const brandedPath = join(dir, "branded.mp4");
+    if (await fileExists(brandedPath)) {
+      return {
+        videoId: maybeId,
+        title: await readTitle(dir, maybeId),
+        filename: `tiktok-${maybeId}.mp4`,
+      };
+    }
+  }
+
+  // Step 1: info JSON — extracts real video ID and duration.
   const infoRes = await run("yt-dlp", [
-    "-J",
-    "--no-playlist",
-    ...await cookieArgs(),
-    "--skip-download",
-    url,
+    "-J", "--no-playlist", ...await cookieArgs(), "--skip-download", url,
   ]);
   if (infoRes.code !== 0) {
     return { error: `yt-dlp info failed: ${infoRes.stderr.slice(0, 200)}` };
@@ -87,18 +109,19 @@ export async function downloadTikTok(
   const dir = join(CACHE_ROOT, videoId);
   await mkdir(dir, { recursive: true });
 
+  // Persist info so we have the title for future fast-path returns.
+  await writeFile(join(dir, "info.json"), infoRes.stdout, "utf8");
+
   const rawPath = join(dir, "raw.mp4");
   const brandedPath = join(dir, "branded.mp4");
 
   // Step 2: download raw video (cached).
   if (!(await fileExists(rawPath))) {
     const dlRes = await run("yt-dlp", [
-      "--no-playlist",
-      ...await cookieArgs(),
+      "--no-playlist", ...await cookieArgs(),
       "-f", "mp4/best[ext=mp4]/best",
       "--merge-output-format", "mp4",
-      "-o", rawPath,
-      url,
+      "-o", rawPath, url,
     ]);
     if (dlRes.code !== 0 || !(await fileExists(rawPath))) {
       return { error: `yt-dlp download failed: ${dlRes.stderr.slice(0, 300)}` };
@@ -109,17 +132,11 @@ export async function downloadTikTok(
   if (!(await fileExists(brandedPath))) {
     const brand = brandAssetPaths(join(process.cwd(), "public"));
     const duration = infoJson.duration ?? 9999;
-    const args = buildTreatmentArgs({
-      source: rawPath,
-      output: brandedPath,
-      orientation: "full-bleed",
-      clipStart: 0,
-      clipDuration: duration,
-      watermarkPath: brand.watermark,
-      vernavleTtf: brand.vernavleTtf,
-      fontsDir: brand.fontsDir,
-    });
-    const ffRes = await runFfmpeg(args);
+    const ffRes = await runFfmpeg(buildTreatmentArgs({
+      source: rawPath, output: brandedPath,
+      orientation: "full-bleed", clipStart: 0, clipDuration: duration,
+      watermarkPath: brand.watermark, vernavleTtf: brand.vernavleTtf, fontsDir: brand.fontsDir,
+    }));
     if (ffRes.code !== 0 || !(await fileExists(brandedPath))) {
       return { error: `ffmpeg failed: ${ffRes.stderr.slice(-300)}` };
     }
