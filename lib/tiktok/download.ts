@@ -36,17 +36,38 @@ export type TikTokResult = {
   filename: string;
 };
 
+/** Resolve tiktok.com/t/ short links to their canonical @user/video/ URL.
+ *  yt-dlp's TikTok extractor doesn't recognise the /t/ format so it falls
+ *  back to the generic extractor and fails. Following the redirect first gives
+ *  us the URL the extractor actually expects. */
+async function resolveUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "follow" });
+    return res.url || url;
+  } catch {
+    return url;
+  }
+}
+
 export async function downloadTikTok(
   rawUrl: string,
 ): Promise<TikTokResult | { error: string }> {
+  // Expand short links (tiktok.com/t/XXXXX) before hitting yt-dlp.
+  const url = /tiktok\.com\/t\//i.test(rawUrl) ? await resolveUrl(rawUrl) : rawUrl;
+
+  // TikTok photo/slideshow posts have no video — catch early.
+  if (/tiktok\.com\/@[^/]+\/photo\//i.test(url)) {
+    return { error: "This is a TikTok photo post — only video posts can be downloaded." };
+  }
+
   // Step 1: info JSON — extracts real video ID and duration regardless of
-  // URL format (short links, @user/video/, etc.).
+  // URL format (@user/video/, vm.tiktok.com/, etc.).
   const infoRes = await run("yt-dlp", [
     "-J",
     "--no-playlist",
     ...await cookieArgs(),
     "--skip-download",
-    rawUrl,
+    url,
   ]);
   if (infoRes.code !== 0) {
     return { error: `yt-dlp info failed: ${infoRes.stderr.slice(0, 200)}` };
@@ -77,7 +98,7 @@ export async function downloadTikTok(
       "-f", "mp4/best[ext=mp4]/best",
       "--merge-output-format", "mp4",
       "-o", rawPath,
-      rawUrl,
+      url,
     ]);
     if (dlRes.code !== 0 || !(await fileExists(rawPath))) {
       return { error: `yt-dlp download failed: ${dlRes.stderr.slice(0, 300)}` };
