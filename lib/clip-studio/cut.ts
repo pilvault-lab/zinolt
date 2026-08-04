@@ -1,6 +1,6 @@
 import { mkdir, access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { clipCacheDir, ensureVideoDownloaded, type CaptionSegment } from "./youtube";
+import { clipCacheDir, type CaptionSegment } from "./youtube";
 import { writeClipAss } from "./captions";
 import {
   brandAssetPaths,
@@ -100,8 +100,7 @@ export async function cutClips(
   await mkdir(outDir, { recursive: true });
 
   if (!(await fileExists(source))) {
-    const dlErr = await ensureVideoDownloaded(videoId);
-    if (dlErr) return { results: [], errors: [{ index: -1, error: dlErr.error }] };
+    return { results: [], errors: [{ index: -1, error: "source_missing" }] };
   }
 
   const brand = brandAssetPaths(join(process.cwd(), "public"));
