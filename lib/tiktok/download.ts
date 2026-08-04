@@ -43,6 +43,7 @@ export async function downloadTikTok(
   const infoRes = await run("yt-dlp", [
     "-J",
     "--no-playlist",
+    "--cookies-from-browser", "chrome",
     "--skip-download",
     rawUrl,
   ]);
@@ -50,12 +51,13 @@ export async function downloadTikTok(
     return { error: `yt-dlp info failed: ${infoRes.stderr.slice(0, 200)}` };
   }
 
-  let infoJson: { id?: string; title?: string; duration?: number };
+  let infoJson: { id?: string; title?: string; duration?: number } | null;
   try {
     infoJson = JSON.parse(infoRes.stdout) as typeof infoJson;
   } catch {
     return { error: "yt-dlp returned invalid JSON" };
   }
+  if (!infoJson) return { error: `yt-dlp returned no info: ${infoRes.stderr.slice(0, 200)}` };
 
   const videoId = infoJson.id;
   if (!videoId) return { error: "could_not_extract_video_id" };
@@ -70,6 +72,7 @@ export async function downloadTikTok(
   if (!(await fileExists(rawPath))) {
     const dlRes = await run("yt-dlp", [
       "--no-playlist",
+      "--cookies-from-browser", "chrome",
       "-f", "mp4/best[ext=mp4]/best",
       "--merge-output-format", "mp4",
       "-o", rawPath,
