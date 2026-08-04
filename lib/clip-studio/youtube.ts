@@ -187,19 +187,6 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
 
   const heatmap = parseHeatmap(infoJson.heatmap);
 
-  // Download the actual video (only if missing).
-  if (!(await fileExists(videoPath))) {
-    const dlRes = await run("yt-dlp", [
-      "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]",
-      "--merge-output-format", "mp4",
-      "-o", videoPath,
-      rawUrl,
-    ]);
-    if (dlRes.code !== 0 || !(await fileExists(videoPath))) {
-      return { error: `yt-dlp download failed: ${dlRes.stderr.slice(0, 300)}` };
-    }
-  }
-
   return {
     videoId,
     title: infoJson.title ?? videoId,
@@ -214,4 +201,25 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
 
 export function clipCacheDir(videoId: string): string {
   return join(CACHE_ROOT, videoId);
+}
+
+/**
+ * Download the source video for a previously-fetched videoId.
+ * Called lazily by the cut route so Fetch only pays for metadata + captions.
+ */
+export async function ensureVideoDownloaded(videoId: string): Promise<{ error: string } | null> {
+  const dir = join(CACHE_ROOT, videoId);
+  const videoPath = join(dir, "video.mp4");
+  if (await fileExists(videoPath)) return null;
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const dlRes = await run("yt-dlp", [
+    "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]",
+    "--merge-output-format", "mp4",
+    "-o", videoPath,
+    url,
+  ]);
+  if (dlRes.code !== 0 || !(await fileExists(videoPath))) {
+    return { error: `yt-dlp download failed: ${dlRes.stderr.slice(0, 300)}` };
+  }
+  return null;
 }
