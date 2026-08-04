@@ -15,14 +15,25 @@ export async function POST(req: Request) {
   const url = (body.url ?? "").trim();
   if (!url) return NextResponse.json({ error: "missing_url" }, { status: 400 });
 
-  const res = await downloadTikTok(url);
-  if ("error" in res) {
-    return NextResponse.json(res, { status: 502 });
+  let res: Awaited<ReturnType<typeof downloadTikTok>>;
+  try {
+    res = await downloadTikTok(url);
+  } catch (e) {
+    return NextResponse.json(
+      { error: `internal_error: ${String(e)}` },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
-  return NextResponse.json({
-    videoId: res.videoId,
-    title: res.title,
-    filename: res.filename,
-    downloadUrl: `/api/tiktok/file?id=${encodeURIComponent(res.videoId)}`,
-  });
+  if ("error" in res) {
+    return NextResponse.json(res, { status: 502, headers: { "Cache-Control": "no-store" } });
+  }
+  return NextResponse.json(
+    {
+      videoId: res.videoId,
+      title: res.title,
+      filename: res.filename,
+      downloadUrl: `/api/tiktok/file?id=${encodeURIComponent(res.videoId)}`,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
