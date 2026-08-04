@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile, mkdir, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
+import { cookieArgs } from "../ytdlp-cookies";
 
 /**
  * yt-dlp wrapper. All shell-outs to yt-dlp live here so the day the
@@ -120,7 +121,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
 
   // (1) info JSON — `-J` implies short-circuit so it MUST be its own call.
   if (!(await fileExists(infoPath))) {
-    const infoRes = await run("yt-dlp", ["-J", "--no-playlist", "--cookies-from-browser", "chrome", "--skip-download", rawUrl], dir);
+    const infoRes = await run("yt-dlp", ["-J", "--no-playlist", ...await cookieArgs(), "--skip-download", rawUrl], dir);
     if (infoRes.code !== 0) {
       return { error: `yt-dlp info failed: ${infoRes.stderr.slice(0, 200)}` };
     }
@@ -146,7 +147,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
     // creator-uploaded talks/podcasts only expose `--write-sub`. Ask for both.
     await run("yt-dlp", [
       "--no-playlist",
-      "--cookies-from-browser", "chrome",
+      ...await cookieArgs(),
       "--write-auto-sub",
       "--write-sub",
       "--sub-lang", "en.*,en",
@@ -193,7 +194,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
   if (!(await fileExists(videoPath))) {
     const dlRes = await run("yt-dlp", [
       "--no-playlist",
-      "--cookies-from-browser", "chrome",
+      ...await cookieArgs(),
       "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]",
       "--merge-output-format", "mp4",
       "-o", videoPath,

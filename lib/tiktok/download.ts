@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, access } from "node:fs/promises";
 import { join } from "node:path";
+import { cookieArgs } from "../ytdlp-cookies";
 import { brandAssetPaths, buildTreatmentArgs, runFfmpeg } from "../video-treatment";
 
 const CACHE_ROOT = join(process.cwd(), ".tiktok-cache");
@@ -43,7 +44,7 @@ export async function downloadTikTok(
   const infoRes = await run("yt-dlp", [
     "-J",
     "--no-playlist",
-    "--cookies-from-browser", "chrome",
+    ...await cookieArgs(),
     "--skip-download",
     rawUrl,
   ]);
@@ -72,7 +73,7 @@ export async function downloadTikTok(
   if (!(await fileExists(rawPath))) {
     const dlRes = await run("yt-dlp", [
       "--no-playlist",
-      "--cookies-from-browser", "chrome",
+      ...await cookieArgs(),
       "-f", "mp4/best[ext=mp4]/best",
       "--merge-output-format", "mp4",
       "-o", rawPath,
