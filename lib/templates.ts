@@ -130,14 +130,6 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/clip-studio/preview.svg",
     href: "/clip-studio",
   },
-  {
-    id: "tiktok-grab",
-    compositionId: "",
-    label: "TikTok Grab",
-    background: "",
-    preview: "/tiktok/preview.svg",
-    href: "/tiktok",
-  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
