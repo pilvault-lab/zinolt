@@ -120,7 +120,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
 
   // (1) info JSON — `-J` implies short-circuit so it MUST be its own call.
   if (!(await fileExists(infoPath))) {
-    const infoRes = await run("yt-dlp", ["-J", "--skip-download", rawUrl], dir);
+    const infoRes = await run("yt-dlp", ["-J", "--no-playlist", "--skip-download", rawUrl], dir);
     if (infoRes.code !== 0) {
       return { error: `yt-dlp info failed: ${infoRes.stderr.slice(0, 200)}` };
     }
@@ -145,6 +145,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
     // Note: `--write-auto-sub` covers YouTube-generated captions, but many
     // creator-uploaded talks/podcasts only expose `--write-sub`. Ask for both.
     await run("yt-dlp", [
+      "--no-playlist",
       "--write-auto-sub",
       "--write-sub",
       "--sub-lang", "en.*,en",
@@ -190,6 +191,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
   // Download the actual video (only if missing).
   if (!(await fileExists(videoPath))) {
     const dlRes = await run("yt-dlp", [
+      "--no-playlist",
       "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]",
       "--merge-output-format", "mp4",
       "-o", videoPath,
