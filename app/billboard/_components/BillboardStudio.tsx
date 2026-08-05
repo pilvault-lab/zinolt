@@ -20,16 +20,21 @@ import {
 const COMP_W = 1080;
 const COMP_H = 1920;
 const PLAYER_MAX_W = 320;
+const PREVIEW_FRAMES = BILLBOARD_FPS * 3; // 3-second preview render
+
+type Stage = "idle" | "previewing" | "preview-ready" | "downloading";
 
 export const BillboardStudio: React.FC = () => {
   const [quote, setQuote] = useState(billboardDefaultProps.quote);
-  const [isRendering, setIsRendering] = useState(false);
+  const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [canExport, setCanExport] = useState<boolean | null>(null);
-  const [exportError, setExportError] = useState("");
+  const [error, setError] = useState("");
   const playerRef = useRef<PlayerRef>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
-  // Player dimensions — scale to fit container
+  // Responsive player width
   const [playerW, setPlayerW] = useState(PLAYER_MAX_W);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -37,8 +42,7 @@ export const BillboardStudio: React.FC = () => {
     const update = () => {
       const el = containerRef.current;
       if (!el) return;
-      const w = Math.min(PLAYER_MAX_W, el.clientWidth - 32);
-      setPlayerW(w);
+      setPlayerW(Math.min(PLAYER_MAX_W, el.clientWidth - 32));
     };
     update();
     window.addEventListener("resize", update);
@@ -46,11 +50,6 @@ export const BillboardStudio: React.FC = () => {
   }, []);
 
   const playerH = Math.round((playerW * COMP_H) / COMP_W);
-
-  const inputProps: BillboardProps = {
-    quote: quote.trim() || billboardDefaultProps.quote,
-    forRender: false,
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -60,33 +59,87 @@ export const BillboardStudio: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const handleDownload = useCallback(async () => {
-    setExportError("");
-    setIsRendering(true);
+  // Revoke old preview URL when quote changes so the stale preview disappears
+  useEffect(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setPreviewUrl(null);
+    setStage("idle");
+  }, [quote]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
+
+  const renderProps = useCallback(
+    (forRender: boolean): BillboardProps => ({
+      quote: quote.trim() || billboardDefaultProps.quote,
+      forRender,
+    }),
+    [quote],
+  );
+
+  const buildComposition = useCallback(
+    (durationInFrames: number) => ({
+      id: "Billboard",
+      component: BillboardComposition,
+      durationInFrames,
+      fps: BILLBOARD_FPS,
+      width: COMP_W,
+      height: COMP_H,
+      defaultProps: billboardDefaultProps,
+      calculateMetadata: () => ({
+        width: COMP_W,
+        height: COMP_H,
+        durationInFrames,
+        fps: BILLBOARD_FPS,
+      }),
+    }),
+    [],
+  );
+
+  const handlePreview = useCallback(async () => {
+    setError("");
+    setStage("previewing");
     setProgress(0);
     try {
-      const renderProps: BillboardProps = {
-        quote: quote.trim() || billboardDefaultProps.quote,
-        forRender: true,
-      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { getBlob } = await renderMediaOnWeb({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        composition: {
-          id: "Billboard",
-          component: BillboardComposition,
-          durationInFrames: BILLBOARD_DURATION_FRAMES,
-          fps: BILLBOARD_FPS,
-          width: COMP_W,
-          height: COMP_H,
-          defaultProps: billboardDefaultProps,
-          calculateMetadata: () => ({
-            width: COMP_W,
-            height: COMP_H,
-            durationInFrames: BILLBOARD_DURATION_FRAMES,
-            fps: BILLBOARD_FPS,
-          }),
-        } as any,
-        inputProps: renderProps as any,
+        composition: buildComposition(PREVIEW_FRAMES) as any,
+        inputProps: renderProps(true) as any,
+        licenseKey: "free-license",
+        videoCodec: "h264",
+        videoBitrate: 6_000_000,
+        hardwareAcceleration: "prefer-hardware",
+        muted: true,
+        onProgress: ({ progress: p }) => setProgress(p),
+      });
+      const blob = await getBlob();
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      previewUrlRef.current = url;
+      setPreviewUrl(url);
+      setStage("preview-ready");
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : String(err));
+      setStage("idle");
+    }
+  }, [buildComposition, renderProps]);
+
+  const handleDownload = useCallback(async () => {
+    setError("");
+    setStage("downloading");
+    setProgress(0);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { getBlob } = await renderMediaOnWeb({
+        composition: buildComposition(BILLBOARD_DURATION_FRAMES) as any,
+        inputProps: renderProps(true) as any,
         licenseKey: "free-license",
         videoCodec: "h264",
         videoBitrate: 14_000_000,
@@ -99,15 +152,12 @@ export const BillboardStudio: React.FC = () => {
       const blob = await getBlob();
       const url = URL.createObjectURL(blob);
 
-      // Try native share sheet on mobile, fall back to anchor download
       if (
         typeof navigator !== "undefined" &&
         navigator.canShare &&
         navigator.canShare({ files: [new File([blob], "billboard.mp4", { type: "video/mp4" })] })
       ) {
-        await navigator.share({
-          files: [new File([blob], "billboard.mp4", { type: "video/mp4" })],
-        });
+        await navigator.share({ files: [new File([blob], "billboard.mp4", { type: "video/mp4" })] });
       } else {
         const a = document.createElement("a");
         a.href = url;
@@ -117,27 +167,26 @@ export const BillboardStudio: React.FC = () => {
         document.body.removeChild(a);
       }
       URL.revokeObjectURL(url);
+      setStage("preview-ready"); // return to preview-ready state after download
     } catch (err) {
       console.error(err);
-      setExportError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsRendering(false);
-      setProgress(0);
+      setError(err instanceof Error ? err.message : String(err));
+      setStage("preview-ready");
     }
-  }, [quote]);
+  }, [buildComposition, renderProps]);
+
+  const busy = stage === "previewing" || stage === "downloading";
+  const liveProps: BillboardProps = renderProps(false);
 
   return (
-    <div
-      className="flex min-h-screen flex-col"
-      style={{ backgroundColor: BRAND.colors.paper }}
-    >
+    <div className="flex min-h-screen flex-col" style={{ backgroundColor: BRAND.colors.paper }}>
       <Header />
 
       <main
         ref={containerRef}
         className="flex flex-1 flex-col items-center gap-6 px-4 py-8"
       >
-        {/* Live preview */}
+        {/* Video area — rendered preview takes over from Player once ready */}
         <div
           style={{
             borderRadius: 12,
@@ -147,32 +196,106 @@ export const BillboardStudio: React.FC = () => {
             height: playerH,
             background: "#111",
             flexShrink: 0,
+            position: "relative",
           }}
         >
-          <Player
-            ref={playerRef}
-            component={BillboardComposition}
-            compositionWidth={COMP_W}
-            compositionHeight={COMP_H}
-            durationInFrames={BILLBOARD_DURATION_FRAMES}
-            fps={BILLBOARD_FPS}
-            style={{ width: playerW, height: playerH }}
-            inputProps={inputProps}
-            autoPlay
-            loop
-            controls={false}
-          />
+          {/* Live Remotion Player — always mounted, hidden once preview is ready */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: previewUrl ? 0 : 1,
+              transition: "opacity 0.2s",
+              pointerEvents: previewUrl ? "none" : "auto",
+            }}
+          >
+            <Player
+              ref={playerRef}
+              component={BillboardComposition}
+              compositionWidth={COMP_W}
+              compositionHeight={COMP_H}
+              durationInFrames={BILLBOARD_DURATION_FRAMES}
+              fps={BILLBOARD_FPS}
+              style={{ width: playerW, height: playerH }}
+              inputProps={liveProps}
+              autoPlay
+              loop
+              controls={false}
+            />
+          </div>
+
+          {/* Rendered preview video */}
+          {previewUrl && (
+            <video
+              key={previewUrl}
+              src={previewUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          )}
+
+          {/* Progress overlay while rendering */}
+          {busy && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(0,0,0,0.55)",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: "60%",
+                  height: 4,
+                  background: "rgba(255,255,255,0.2)",
+                  borderRadius: 2,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.round(progress * 100)}%`,
+                    background: "#fff",
+                    borderRadius: 2,
+                    transition: "width 0.1s",
+                  }}
+                />
+              </div>
+              <span
+                style={{
+                  color: "#fff",
+                  fontFamily: "sans-serif",
+                  fontSize: 13,
+                  opacity: 0.85,
+                }}
+              >
+                {stage === "previewing" ? "Rendering preview…" : "Rendering…"}{" "}
+                {Math.round(progress * 100)}%
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Controls */}
         <div
-          className="w-full max-w-sm flex flex-col gap-4 rounded-xl border p-4"
-          style={{
-            backgroundColor: BRAND.colors.paper,
-            borderColor: BRAND.colors.grey200,
-          }}
+          className="w-full max-w-sm flex flex-col gap-3 rounded-xl border p-4"
+          style={{ backgroundColor: BRAND.colors.paper, borderColor: BRAND.colors.grey200 }}
         >
-          {/* Quote input */}
           <div className="flex flex-col gap-1">
             <label
               htmlFor="bb-quote"
@@ -196,30 +319,45 @@ export const BillboardStudio: React.FC = () => {
             />
           </div>
 
-          {/* Download */}
-          <Button
-            onClick={handleDownload}
-            disabled={isRendering || canExport === false}
-            className="w-full font-sans"
-          >
-            {isRendering
-              ? `Rendering… ${Math.round(progress * 100)}%`
-              : "Download video"}
-          </Button>
-
-          {canExport === false && (
-            <p
-              className="font-sans text-xs"
-              style={{ color: BRAND.colors.grey500 }}
+          {/* Preview → Download two-step */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePreview}
+              disabled={busy || canExport === false}
+              className="flex-1 font-sans"
             >
-              Your browser doesn&apos;t support in-browser rendering. Try Chrome
-              or Edge.
+              {stage === "previewing"
+                ? `${Math.round(progress * 100)}%`
+                : stage === "preview-ready"
+                ? "Re-preview"
+                : "Preview (3s)"}
+            </Button>
+
+            <Button
+              onClick={handleDownload}
+              disabled={busy || stage !== "preview-ready" || canExport === false}
+              className="flex-1 font-sans"
+            >
+              {stage === "downloading"
+                ? `${Math.round(progress * 100)}%`
+                : "Download"}
+            </Button>
+          </div>
+
+          {stage === "idle" && (
+            <p className="font-sans text-[11px]" style={{ color: BRAND.colors.grey500 }}>
+              Render a 3-second preview first, then download the full clip.
             </p>
           )}
 
-          {exportError && (
-            <p className="font-sans text-xs text-red-500">{exportError}</p>
+          {canExport === false && (
+            <p className="font-sans text-xs" style={{ color: BRAND.colors.grey500 }}>
+              Your browser doesn&apos;t support in-browser rendering. Try Chrome or Edge.
+            </p>
           )}
+
+          {error && <p className="font-sans text-xs text-red-500">{error}</p>}
         </div>
       </main>
     </div>
