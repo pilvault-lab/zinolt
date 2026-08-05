@@ -130,6 +130,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/clip-studio/preview.svg",
     href: "/clip-studio",
   },
+  {
+    id: "billboard",
+    compositionId: "Billboard",
+    label: "Billboard",
+    background: "",
+    preview: "/billboard/preview.svg",
+    href: "/billboard",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;

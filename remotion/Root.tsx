@@ -26,6 +26,12 @@ import {
   DM_TOTAL_FRAMES,
   DM_WIDTH,
 } from "./daily-movers/DailyMovers";
+import {
+  BillboardComposition,
+  billboardDefaultProps,
+  BILLBOARD_FPS,
+  BILLBOARD_DURATION_FRAMES,
+} from "./billboard/BillboardComposition";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -114,5 +120,14 @@ export const RemotionRoot: React.FC = () => (
         defaultProps={{ ...stackedDefaultProps, aspect }}
       />
     ))}
+    <Composition
+      id="Billboard"
+      component={BillboardComposition}
+      durationInFrames={BILLBOARD_DURATION_FRAMES}
+      fps={BILLBOARD_FPS}
+      width={1080}
+      height={1920}
+      defaultProps={billboardDefaultProps}
+    />
   </>
 );
