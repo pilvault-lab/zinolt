@@ -5,9 +5,9 @@
 
 export const CAPTIONS_CONFIG = {
   /** Never exceed this many words per group. */
-  MAX_WORDS_PER_GROUP: 4,
+  MAX_WORDS_PER_GROUP: 1,
   /** Push the group up to this many words if the natural cut lands on a filler. */
-  ORPHAN_EXTEND_TO: 6,
+  ORPHAN_EXTEND_TO: 1,
 
   /** Font. Must be installed in the /public/brand fonts dir. */
   FONTNAME: "Vernavle",

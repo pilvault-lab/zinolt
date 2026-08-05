@@ -150,7 +150,7 @@ export const InCardComposition: React.FC<InCardProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "5%",
+          padding: "5% 5% 5% 8%",
         }}
       >
         <div

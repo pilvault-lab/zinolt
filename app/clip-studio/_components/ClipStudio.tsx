@@ -147,7 +147,7 @@ export const ClipStudio: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Treatment options
-  const [orientation, setOrientation] = useState<"full-bleed" | "letterboxed">("full-bleed");
+  const [orientation, setOrientation] = useState<"full-bleed" | "letterboxed">("letterboxed");
   const [burnCaptions, setBurnCaptions] = useState(false);
 
   // Per-clip headline overrides — keyed by clip index in the current parse.
@@ -354,17 +354,19 @@ export const ClipStudio: React.FC = () => {
                     Letterboxed
                   </Button>
                 </div>
-                <label
-                  className="mt-1 flex items-center gap-2 font-sans text-xs"
-                  style={{ color: BRAND.colors.ink }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={burnCaptions}
-                    onChange={(e) => setBurnCaptions(e.target.checked)}
-                  />
-                  Burn captions (lower third)
-                </label>
+                {orientation === "full-bleed" ? (
+                  <label
+                    className="mt-1 flex items-center gap-2 font-sans text-xs"
+                    style={{ color: BRAND.colors.ink }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={burnCaptions}
+                      onChange={(e) => setBurnCaptions(e.target.checked)}
+                    />
+                    Burn captions (lower third)
+                  </label>
+                ) : null}
                 <p
                   className="font-sans text-[11px] leading-snug"
                   style={{ color: BRAND.colors.grey500 }}

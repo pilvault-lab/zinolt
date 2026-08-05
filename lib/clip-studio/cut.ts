@@ -93,9 +93,9 @@ export async function cutClips(
 ): Promise<{ results: CutResult[]; errors: Array<{ index: number; error: string }> }> {
   const dir = clipCacheDir(videoId);
   const source = join(dir, "video.mp4");
-  // Distinct output directory per (orientation, captions) combination so
-  // switching modes doesn't overwrite previous renders.
-  const modeTag = `${opts.orientation}${opts.burnCaptions ? "-cc" : ""}`;
+  // Letterboxed clips never burn captions — the headline serves that role.
+  const burnCaptions = opts.orientation === "letterboxed" ? false : opts.burnCaptions;
+  const modeTag = `${opts.orientation}${burnCaptions ? "-cc" : ""}`;
   const outDir = join(dir, "cuts", modeTag);
   await mkdir(outDir, { recursive: true });
 
@@ -104,7 +104,7 @@ export async function cutClips(
   }
 
   const brand = brandAssetPaths(join(process.cwd(), "public"));
-  const transcript = opts.burnCaptions ? await loadTranscript(videoId) : [];
+  const transcript = burnCaptions ? await loadTranscript(videoId) : [];
 
   const results: CutResult[] = [];
   const errors: Array<{ index: number; error: string }> = [];
@@ -125,7 +125,7 @@ export async function cutClips(
     if (!(await fileExists(outPath))) {
       // Write per-clip ASS subtitles when captions are on.
       let subtitlesAssPath: string | undefined;
-      if (opts.burnCaptions && transcript.length > 0) {
+      if (burnCaptions && transcript.length > 0) {
         subtitlesAssPath = join(outDir, `clip-${String(i + 1).padStart(2, "0")}.ass`);
         await writeClipAss({
           videoId,           // enables word-level chunking from the json3 cache

@@ -25,7 +25,8 @@ export async function POST(req: Request) {
 
   const orientation =
     body.orientation === "letterboxed" ? "letterboxed" : "full-bleed";
-  const burnCaptions = body.burnCaptions !== false;
+  // Letterboxed clips never get burned captions — the headline text serves that role.
+  const burnCaptions = orientation !== "letterboxed" && body.burnCaptions !== false;
   const opts: CutOptions = { orientation, burnCaptions };
 
   const out = await cutClips(videoId, clips, opts);
