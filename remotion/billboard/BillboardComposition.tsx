@@ -8,7 +8,6 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { Video as MediaVideo } from "@remotion/media";
 
 /* ─── Dev-adjustable config ─────────────────────────────────────────────────
  * Background, corner points, and style live here.
@@ -69,12 +68,10 @@ export const BILLBOARD_DURATION_FRAMES = BILLBOARD_FPS * 12;
 
 export type BillboardProps = {
   quote: string;
-  forRender?: boolean;
 };
 
 export const billboardDefaultProps: BillboardProps = {
   quote: "The best time to plant a tree was 20 years ago.",
-  forRender: false,
 };
 
 /* ─── Font loading ───────────────────────────────────────────────────────── */
@@ -181,10 +178,7 @@ const GrainDefs: React.FC = () => (
 );
 
 /* ─── Composition ────────────────────────────────────────────────────────── */
-export const BillboardComposition: React.FC<BillboardProps> = ({
-  quote,
-  forRender = false,
-}) => {
+export const BillboardComposition: React.FC<BillboardProps> = ({ quote }) => {
   const frame = useCurrentFrame();
   const cfg = BILLBOARD_CONFIG;
 
@@ -249,21 +243,12 @@ export const BillboardComposition: React.FC<BillboardProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#111" }}>
-      {/* Background street clip */}
-      {forRender ? (
-        <MediaVideo
-          src={bgSrc}
-          muted
-          loop
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : (
-        <OffthreadVideo
-          src={bgSrc}
-          muted
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      )}
+      {/* Background street clip — OffthreadVideo for frame-accurate decoding in both preview and render */}
+      <OffthreadVideo
+        src={bgSrc}
+        muted
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
 
       {/* Grain overlay */}
       {cfg.grainOpacity > 0 && (

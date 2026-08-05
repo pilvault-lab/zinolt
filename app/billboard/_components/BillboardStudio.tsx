@@ -76,9 +76,8 @@ export const BillboardStudio: React.FC = () => {
   }, []);
 
   const renderProps = useCallback(
-    (forRender: boolean): BillboardProps => ({
+    (): BillboardProps => ({
       quote: quote.trim() || billboardDefaultProps.quote,
-      forRender,
     }),
     [quote],
   );
@@ -110,7 +109,7 @@ export const BillboardStudio: React.FC = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { getBlob } = await renderMediaOnWeb({
         composition: buildComposition(PREVIEW_FRAMES) as any,
-        inputProps: renderProps(true) as any,
+        inputProps: renderProps() as any,
         licenseKey: "free-license",
         videoCodec: "h264",
         videoBitrate: 6_000_000,
@@ -139,7 +138,7 @@ export const BillboardStudio: React.FC = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { getBlob } = await renderMediaOnWeb({
         composition: buildComposition(BILLBOARD_DURATION_FRAMES) as any,
-        inputProps: renderProps(true) as any,
+        inputProps: renderProps() as any,
         licenseKey: "free-license",
         videoCodec: "h264",
         videoBitrate: 14_000_000,
@@ -176,7 +175,7 @@ export const BillboardStudio: React.FC = () => {
   }, [buildComposition, renderProps]);
 
   const busy = stage === "previewing" || stage === "downloading";
-  const liveProps: BillboardProps = renderProps(false);
+  const liveProps: BillboardProps = renderProps();
 
   return (
     <div className="flex min-h-screen flex-col" style={{ backgroundColor: BRAND.colors.paper }}>
