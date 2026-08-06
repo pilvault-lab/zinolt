@@ -63,7 +63,6 @@ export const STORY_CARD_CONFIG = {
   brandFontSize: 20,
   brandLetterSpacing: "0.28em",
   brandOpacity: 0.45,
-  brandBottomPx: 88,
 } as const;
 
 export const STORY_CARD_FPS = 30;
@@ -209,26 +208,23 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
             </p>
           );
         })}
-      </div>
 
-      {/* Brand watermark */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: cfg.brandBottomPx,
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          fontFamily: cfg.brandFontFamily,
-          fontSize: cfg.brandFontSize,
-          letterSpacing: cfg.brandLetterSpacing,
-          color: "#FFFFFF",
-          opacity: cfg.brandOpacity,
-          textTransform: "uppercase",
-          textShadow: "0 1px 6px rgba(0,0,0,0.5)",
-        }}
-      >
-        {cfg.brandText}
+        {/* Brand watermark — always 5px below the last paragraph */}
+        <div
+          style={{
+            marginTop: 5,
+            textAlign: "center",
+            fontFamily: cfg.brandFontFamily,
+            fontSize: cfg.brandFontSize,
+            letterSpacing: cfg.brandLetterSpacing,
+            color: "#FFFFFF",
+            opacity: cfg.brandOpacity,
+            textTransform: "uppercase",
+            textShadow: "0 1px 6px rgba(0,0,0,0.5)",
+          }}
+        >
+          {cfg.brandText}
+        </div>
       </div>
     </AbsoluteFill>
   );
