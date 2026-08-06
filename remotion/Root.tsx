@@ -27,11 +27,11 @@ import {
   DM_WIDTH,
 } from "./daily-movers/DailyMovers";
 import {
-  BillboardComposition,
-  billboardDefaultProps,
-  BILLBOARD_FPS,
-  BILLBOARD_DURATION_FRAMES,
-} from "./billboard/BillboardComposition";
+  StoryCardComposition,
+  storyCardDefaultProps,
+  STORY_CARD_FPS,
+  STORY_CARD_DURATION_FRAMES,
+} from "./story-card/StoryCardComposition";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -88,6 +88,15 @@ export const RemotionRoot: React.FC = () => (
       />
     ))}
     <Composition
+      id="StoryCard"
+      component={StoryCardComposition}
+      durationInFrames={STORY_CARD_DURATION_FRAMES}
+      fps={STORY_CARD_FPS}
+      width={1080}
+      height={1920}
+      defaultProps={storyCardDefaultProps}
+    />
+    <Composition
       id="LetterboxReel"
       component={LetterboxReel}
       durationInFrames={450}
@@ -120,14 +129,6 @@ export const RemotionRoot: React.FC = () => (
         defaultProps={{ ...stackedDefaultProps, aspect }}
       />
     ))}
-    <Composition
-      id="Billboard"
-      component={BillboardComposition}
-      durationInFrames={BILLBOARD_DURATION_FRAMES}
-      fps={BILLBOARD_FPS}
-      width={1080}
-      height={1920}
-      defaultProps={billboardDefaultProps}
-    />
+
   </>
 );

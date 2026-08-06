@@ -131,12 +131,12 @@ export const TEMPLATES: readonly Template[] = [
     href: "/clip-studio",
   },
   {
-    id: "billboard",
-    compositionId: "Billboard",
-    label: "Billboard",
+    id: "story-card",
+    compositionId: "StoryCard",
+    label: "Story Card",
     background: "",
-    preview: "/billboard/preview.svg",
-    href: "/billboard",
+    preview: "/story-card/preview.svg",
+    href: "/story-card",
   },
 ] as const;
 

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920">
+  <rect width="1080" height="1920" fill="#060810"/>
+  <rect width="1080" height="1920" fill="rgba(0,0,0,0.55)"/>
+  <!-- Vignette -->
+  <radialGradient id="vg" cx="50%" cy="50%" r="70%">
+    <stop offset="35%" stop-color="transparent"/>
+    <stop offset="100%" stop-color="rgba(0,0,0,0.55)"/>
+  </radialGradient>
+  <rect width="1080" height="1920" fill="url(#vg)"/>
+  <!-- Text lines -->
+  <text x="92" y="840" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="72" font-weight="400" fill="white" opacity="0.95">Markets don't care</text>
+  <text x="92" y="930" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="72" font-weight="400" fill="white" opacity="0.95">about your feelings.</text>
+  <text x="92" y="1060" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="72" font-weight="400" fill="white" opacity="0.95">The data always tells</text>
+  <text x="92" y="1150" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="72" font-weight="400" fill="white" opacity="0.95">the truth.</text>
+  <!-- Brand -->
+  <text x="540" y="1820" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" letter-spacing="8" fill="white" opacity="0.45" text-anchor="middle">VERNAVLE</text>
+</svg>
