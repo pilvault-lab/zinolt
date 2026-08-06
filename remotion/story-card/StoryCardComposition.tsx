@@ -8,6 +8,7 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
+import { Video as MediaVideo } from "@remotion/media";
 
 /* ─── Config ─────────────────────────────────────────────────────────────────
  * All pre-configured values live here. Swap backgrounds, adjust opacity,
@@ -72,11 +73,14 @@ export type StoryCardProps = {
   text: string;
   /** Path relative to /public, e.g. "story-card/backgrounds/night-city.mp4" */
   backgroundSrc: string;
+  /** True only when rendering via renderMediaOnWeb — picks @remotion/media <Video>. */
+  forRender: boolean;
 };
 
 export const storyCardDefaultProps: StoryCardProps = {
   text: "Markets don't care about your feelings.\n\nThe data always tells the truth. Position yourself accordingly.\n\nPatience is the edge most retail investors never develop.",
   backgroundSrc: STORY_CARD_CONFIG.backgrounds[0].src,
+  forRender: false,
 };
 
 /* ─── Font loading ───────────────────────────────────────────────────────── */
@@ -116,6 +120,7 @@ loadFontOnce(
 export const StoryCardComposition: React.FC<StoryCardProps> = ({
   text,
   backgroundSrc,
+  forRender,
 }) => {
   const frame = useCurrentFrame();
   const cfg = STORY_CARD_CONFIG;
@@ -132,12 +137,19 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      {/* Background loop — OffthreadVideo for frame-accurate render */}
-      <OffthreadVideo
-        src={staticFile(backgroundSrc)}
-        muted
-        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-      />
+      {/* Background loop */}
+      {forRender ? (
+        <MediaVideo
+          src={staticFile(backgroundSrc)}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <OffthreadVideo
+          src={staticFile(backgroundSrc)}
+          muted
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      )}
 
       {/* Primary darkening overlay */}
       <AbsoluteFill

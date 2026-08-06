@@ -61,6 +61,7 @@ export const StoryCardStudio: React.FC = () => {
   const currentProps: StoryCardProps = {
     text: text.trim() || storyCardDefaultProps.text,
     backgroundSrc: selectedBg,
+    forRender: false,
   };
 
   const handleDownload = useCallback(async () => {
@@ -87,7 +88,7 @@ export const StoryCardStudio: React.FC = () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        inputProps: currentProps as any,
+        inputProps: { ...currentProps, forRender: true } as any,
         licenseKey: "free-license",
         videoCodec: "h264",
         videoBitrate: 12_000_000,
