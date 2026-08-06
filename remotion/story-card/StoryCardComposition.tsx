@@ -57,12 +57,6 @@ export const STORY_CARD_CONFIG = {
   /** Delay (frames) before the first paragraph begins fading in. */
   fadeInStartFrame: 10,
 
-  /** VERNAVLE watermark at the bottom. */
-  brandText: "VERNAVLE",
-  brandFontFamily: "'Vernavle', sans-serif",
-  brandFontSize: 20,
-  brandLetterSpacing: "0.28em",
-  brandOpacity: 0.45,
 } as const;
 
 export const STORY_CARD_FPS = 30;
@@ -84,7 +78,6 @@ export const storyCardDefaultProps: StoryCardProps = {
 
 /* ─── Font loading ───────────────────────────────────────────────────────── */
 let _messinaLoaded = false;
-let _vernavleLoaded = false;
 
 function loadFontOnce(
   family: string,
@@ -107,12 +100,6 @@ loadFontOnce(
   `url(${staticFile("brand/MessinaSansWeb-VF-Upright.woff2")}) format('woff2')`,
   () => _messinaLoaded,
   () => { _messinaLoaded = true; },
-);
-loadFontOnce(
-  "Vernavle",
-  `url(${staticFile("brand/vernavle-font.woff2")}) format('woff2')`,
-  () => _vernavleLoaded,
-  () => { _vernavleLoaded = true; },
 );
 
 /* ─── Composition ────────────────────────────────────────────────────────── */
@@ -209,22 +196,7 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
           );
         })}
 
-        {/* Brand watermark — always 5px below the last paragraph */}
-        <div
-          style={{
-            marginTop: 5,
-            textAlign: "center",
-            fontFamily: cfg.brandFontFamily,
-            fontSize: cfg.brandFontSize,
-            letterSpacing: cfg.brandLetterSpacing,
-            color: "#FFFFFF",
-            opacity: cfg.brandOpacity,
-            textTransform: "uppercase",
-            textShadow: "0 1px 6px rgba(0,0,0,0.5)",
-          }}
-        >
-          {cfg.brandText}
-        </div>
+
       </div>
     </AbsoluteFill>
   );
