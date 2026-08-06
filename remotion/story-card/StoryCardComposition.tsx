@@ -141,7 +141,8 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
       {forRender ? (
         <MediaVideo
           src={staticFile(backgroundSrc)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          objectFit="cover"
+          style={{ width: "100%", height: "100%" }}
         />
       ) : (
         <OffthreadVideo
