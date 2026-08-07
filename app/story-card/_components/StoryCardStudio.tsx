@@ -26,7 +26,7 @@ export const StoryCardStudio: React.FC = () => {
   const [selectedBg, setSelectedBg] = useState(
     STORY_CARD_CONFIG.backgrounds[0].src,
   );
-  const [fontSize, setFontSize] = useState(STORY_CARD_CONFIG.fontSize);
+  const [fontSize, setFontSize] = useState<number>(STORY_CARD_CONFIG.fontSize);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
