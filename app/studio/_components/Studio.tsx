@@ -43,6 +43,7 @@ const CAPTION_POSITION_LABELS: Record<CaptionPosition, string> = {
 import { getTemplate } from "@/lib/templates";
 import { useSearchParams } from "next/navigation";
 import { Header } from "../../_components/Header";
+import { stripVideoMetadata } from "@/lib/strip-video-metadata";
 
 const NO_AUDIO = "__none__";
 
@@ -495,7 +496,7 @@ export const Studio: React.FC = () => {
           : { muted: true }),
         onProgress: ({ progress: p }) => setProgress(p),
       });
-      const blob = await getBlob();
+      const blob = await stripVideoMetadata(await getBlob());
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

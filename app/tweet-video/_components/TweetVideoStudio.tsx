@@ -45,6 +45,7 @@ import type {
   CardTheme,
 } from "@/remotion/tweet/types";
 import { Header } from "../../_components/Header";
+import { stripVideoMetadata } from "@/lib/strip-video-metadata";
 
 const LOOP_LIBRARY: Array<{ id: string; label: string; src: string }> = [
   { id: "light-ray-white", label: "Light Ray", src: "/rays/light-ray-white.mp4" },
@@ -510,7 +511,7 @@ export const TweetVideoStudio: React.FC = () => {
           : { muted: true }),
         onProgress: ({ progress: p }) => setProgress(p),
       });
-      const blob = await getBlob();
+      const blob = await stripVideoMetadata(await getBlob());
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

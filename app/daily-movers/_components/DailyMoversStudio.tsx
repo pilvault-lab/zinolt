@@ -20,6 +20,7 @@ import {
   type DailyMoversProps,
 } from "@/remotion/daily-movers/DailyMovers";
 import { Header } from "../../_components/Header";
+import { stripVideoMetadata } from "@/lib/strip-video-metadata";
 
 const PLAYER_MAX_W = 380;
 const MAX_PICKS = 5;
@@ -184,7 +185,7 @@ export const DailyMoversStudio: React.FC = () => {
         delayRenderTimeoutInMilliseconds: 60_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
-      const blob = await getBlob();
+      const blob = await stripVideoMetadata(await getBlob());
       const filename = `daily-movers_${payload.sessionDate}.mp4`;
       await saveOrShare(blob, filename);
     } catch (err) {

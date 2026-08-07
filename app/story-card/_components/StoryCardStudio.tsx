@@ -6,6 +6,7 @@ import { canRenderMediaOnWeb, renderMediaOnWeb } from "@remotion/web-renderer";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 import { Header } from "../../_components/Header";
+import { stripVideoMetadata } from "@/lib/strip-video-metadata";
 import {
   StoryCardComposition,
   storyCardDefaultProps,
@@ -100,15 +101,7 @@ export const StoryCardStudio: React.FC = () => {
         muted: true,
         onProgress: ({ progress: p }) => setProgress(p),
       });
-      const raw = await getBlob();
-
-      // Strip encoder/tool metadata so the file carries no AI-origin signals
-      const stripped = await fetch("/api/story-card/strip-metadata", {
-        method: "POST",
-        headers: { "Content-Type": "video/mp4" },
-        body: raw,
-      });
-      const blob = stripped.ok ? await stripped.blob() : raw;
+      const blob = await stripVideoMetadata(await getBlob());
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

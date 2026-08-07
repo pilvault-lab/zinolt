@@ -38,6 +38,7 @@ import {
   type TimeMachineProps,
 } from "@/remotion/time-machine/TimeMachine";
 import { Header } from "../../_components/Header";
+import { stripVideoMetadata } from "@/lib/strip-video-metadata";
 
 const TTS_VOICES = [
   { id: "en-US-ChristopherNeural", label: "Christopher (US)" },
@@ -385,7 +386,7 @@ export const TimeMachineStudio: React.FC = () => {
         delayRenderTimeoutInMilliseconds: 180_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
-      const blob = await getBlob();
+      const blob = await stripVideoMetadata(await getBlob());
       const filename = `${activeSymbol}_${portfolio.year}_${amount}.mp4`;
       const { url, videoBlob } = makeVideoUrl(blob);
       // Show the video inline immediately — this is the reliable iOS save
