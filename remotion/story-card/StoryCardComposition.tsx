@@ -68,12 +68,15 @@ export type StoryCardProps = {
   backgroundSrc: string;
   /** True only when rendering via renderMediaOnWeb — picks @remotion/media <Video>. */
   forRender: boolean;
+  /** Override font size (px). Defaults to STORY_CARD_CONFIG.fontSize. */
+  fontSize?: number;
 };
 
 export const storyCardDefaultProps: StoryCardProps = {
   text: "Markets don't care about your feelings.\n\nThe data always tells the truth. Position yourself accordingly.\n\nPatience is the edge most retail investors never develop.",
   backgroundSrc: STORY_CARD_CONFIG.backgrounds[0].src,
   forRender: false,
+  fontSize: STORY_CARD_CONFIG.fontSize,
 };
 
 /* ─── Font loading ───────────────────────────────────────────────────────── */
@@ -107,9 +110,11 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
   text,
   backgroundSrc,
   forRender,
+  fontSize: fontSizeProp,
 }) => {
   const frame = useCurrentFrame();
   const cfg = STORY_CARD_CONFIG;
+  const fontSize = fontSizeProp ?? cfg.fontSize;
 
   const paragraphs = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
 
@@ -118,6 +123,8 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
   const textW = Math.round(COMP_W * cfg.textWidthFraction);
   const textX = Math.round((COMP_W - textW) / 2);
   const centerPx = Math.round(COMP_H * cfg.textCenterY);
+  // Max height the text block may occupy — clips overflow cleanly rather than running off-screen
+  const maxTextH = Math.round(COMP_H * 0.82);
 
   const vignette = `radial-gradient(ellipse 80% 65% at 50% 50%, transparent 35%, rgba(0,0,0,${cfg.vignetteOpacity}) 100%)`;
 
@@ -154,6 +161,8 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
           position: "absolute",
           left: textX,
           width: textW,
+          maxHeight: maxTextH,
+          overflow: "hidden",
           top: centerPx,
           transform: "translateY(-50%)",
         }}
@@ -181,7 +190,7 @@ export const StoryCardComposition: React.FC<StoryCardProps> = ({
                 marginBottom:
                   i < paragraphs.length - 1 ? cfg.paragraphGap : 0,
                 fontFamily: cfg.fontFamily,
-                fontSize: cfg.fontSize,
+                fontSize,
                 fontWeight: cfg.fontWeight,
                 lineHeight: cfg.lineHeight,
                 color: cfg.textColor,

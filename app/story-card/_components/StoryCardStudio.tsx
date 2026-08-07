@@ -25,6 +25,7 @@ export const StoryCardStudio: React.FC = () => {
   const [selectedBg, setSelectedBg] = useState(
     STORY_CARD_CONFIG.backgrounds[0].src,
   );
+  const [fontSize, setFontSize] = useState(STORY_CARD_CONFIG.fontSize);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -62,6 +63,7 @@ export const StoryCardStudio: React.FC = () => {
     text: text.trim() || storyCardDefaultProps.text,
     backgroundSrc: selectedBg,
     forRender: false,
+    fontSize,
   };
 
   const handleDownload = useCallback(async () => {
@@ -98,11 +100,20 @@ export const StoryCardStudio: React.FC = () => {
         muted: true,
         onProgress: ({ progress: p }) => setProgress(p),
       });
-      const blob = await getBlob();
+      const raw = await getBlob();
+
+      // Strip encoder/tool metadata so the file carries no AI-origin signals
+      const stripped = await fetch("/api/story-card/strip-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "video/mp4" },
+        body: raw,
+      });
+      const blob = stripped.ok ? await stripped.blob() : raw;
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "story-card.mp4";
+      a.download = "story.mp4";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -119,7 +130,7 @@ export const StoryCardStudio: React.FC = () => {
       setIsRendering(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, selectedBg]);
+  }, [text, selectedBg, fontSize]);
 
   return (
     <div
@@ -166,6 +177,36 @@ export const StoryCardStudio: React.FC = () => {
                 backgroundColor: "#FFFFFF",
                 outline: "none",
               }}
+            />
+          </div>
+
+          {/* Font size */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="sc-fontsize"
+                className="font-sans text-xs uppercase tracking-wide"
+                style={{ color: BRAND.colors.grey500 }}
+              >
+                Font size
+              </label>
+              <span
+                className="font-mono text-xs tabular-nums"
+                style={{ color: BRAND.colors.grey500 }}
+              >
+                {fontSize}px
+              </span>
+            </div>
+            <input
+              id="sc-fontsize"
+              type="range"
+              min={28}
+              max={96}
+              step={2}
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              className="w-full accent-current"
+              style={{ accentColor: BRAND.colors.ink }}
             />
           </div>
 
