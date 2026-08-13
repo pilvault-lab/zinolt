@@ -123,7 +123,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
   if (!(await fileExists(infoPath))) {
     const infoRes = await run("yt-dlp", ["-J", "--no-playlist", ...await cookieArgs(), "--skip-download", rawUrl], dir);
     if (infoRes.code !== 0) {
-      return { error: `yt-dlp info failed: ${infoRes.stderr.slice(0, 200)}` };
+      return { error: interpretYtdlpError("info", infoRes.stderr) };
     }
     await writeFile(infoPath, infoRes.stdout, "utf8");
   }
@@ -201,7 +201,7 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
       rawUrl,
     ]);
     if (dlRes.code !== 0 || !(await fileExists(videoPath))) {
-      return { error: `yt-dlp download failed: ${dlRes.stderr.slice(0, 300)}` };
+      return { error: interpretYtdlpError("download", dlRes.stderr) };
     }
   }
 
@@ -219,4 +219,28 @@ export async function fetchYouTube(rawUrl: string): Promise<FetchedVideo | { err
 
 export function clipCacheDir(videoId: string): string {
   return join(CACHE_ROOT, videoId);
+}
+
+/**
+ * Turn yt-dlp stderr into an actionable error. YouTube's cookie-rotation
+ * defense invalidates exported cookies seconds after export if the source
+ * browser tab is still open — surface the fix, not the raw warning.
+ */
+function interpretYtdlpError(phase: "info" | "download", stderr: string): string {
+  const s = stderr || "";
+  const cookieRotated = /cookies are no longer valid|rotated in the browser|Sign in to confirm/i.test(s);
+  if (cookieRotated) {
+    return (
+      `YouTube rejected the request: session cookies are stale. ` +
+      `We're now using Firefox live cookies (--cookies-from-browser firefox). ` +
+      `Make sure Firefox is installed and signed in to YouTube — no exports needed.`
+    );
+  }
+  if (/HTTP Error 429|Too Many Requests/i.test(s)) {
+    return `YouTube rate-limited this IP. Wait a few minutes before retrying.`;
+  }
+  if (/Video unavailable|Private video|has been removed/i.test(s)) {
+    return `Video is unavailable, private, or removed on YouTube.`;
+  }
+  return `yt-dlp ${phase} failed: ${s.slice(0, 300)}`;
 }
