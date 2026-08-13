@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 384" width="216" height="384">
+  <rect width="216" height="384" fill="#0A0A0A"/>
+  <g fill="#FFFFFF">
+    <text x="108" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" letter-spacing="-1">TOP 10</text>
+    <text x="108" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" letter-spacing="2" opacity="0.55">RANKING</text>
+  </g>
+  <g opacity="0.85">
+    <circle cx="60" cy="150" r="24" fill="#1A1A1A" stroke="#FFFFFF" stroke-width="1.5"/>
+    <text x="98" y="146" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="10" letter-spacing="2" opacity="0.55">#3</text>
+    <text x="98" y="162" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="15" font-weight="700">$283B</text>
+  </g>
+  <g>
+    <circle cx="60" cy="210" r="30" fill="#2A2A2A" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="104" y="204" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="11" letter-spacing="2" opacity="0.7">#1</text>
+    <text x="104" y="224" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="20" font-weight="700">$760B</text>
+  </g>
+  <g opacity="0.55">
+    <circle cx="60" cy="272" r="24" fill="#1A1A1A" stroke="#FFFFFF" stroke-width="1.5"/>
+    <text x="98" y="268" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="10" letter-spacing="2" opacity="0.5">#2</text>
+    <text x="98" y="284" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="15" font-weight="700">$292B</text>
+  </g>
+  <text x="108" y="352" text-anchor="middle" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="10" letter-spacing="3" opacity="0.5">ASCENDING PODIUM</text>
+</svg>

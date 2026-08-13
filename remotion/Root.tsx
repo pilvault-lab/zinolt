@@ -32,6 +32,14 @@ import {
   STORY_CARD_FPS,
   STORY_CARD_DURATION_FRAMES,
 } from "./story-card/StoryCardComposition";
+import {
+  RankingComposition,
+  rankingDefaultProps,
+  RK_FPS,
+  RK_HEIGHT,
+  RK_TOTAL_FRAMES,
+  RK_WIDTH,
+} from "./ranking/Ranking";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -69,12 +77,24 @@ export const RemotionRoot: React.FC = () => (
       height={DM_HEIGHT}
       defaultProps={dailyMoversDefaultProps}
     />
+    <Composition
+      id="Ranking"
+      component={RankingComposition}
+      durationInFrames={RK_TOTAL_FRAMES}
+      fps={RK_FPS}
+      width={RK_WIDTH}
+      height={RK_HEIGHT}
+      defaultProps={rankingDefaultProps}
+    />
     {TEMPLATES.filter(
       (t) =>
+        Boolean(t.compositionId) &&
         t.id !== "letterbox" &&
         t.id !== "tweet-video" &&
         t.id !== "time-machine" &&
-        t.id !== "daily-movers",
+        t.id !== "daily-movers" &&
+        t.id !== "story-card" &&
+        t.id !== "ranking",
     ).map((t) => (
       <Composition
         key={t.compositionId}

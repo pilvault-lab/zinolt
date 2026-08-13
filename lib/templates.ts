@@ -138,6 +138,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/story-card/preview.svg",
     href: "/story-card",
   },
+  {
+    id: "ranking",
+    compositionId: "Ranking",
+    label: "Ranking",
+    background: "",
+    preview: "/ranking/preview.svg",
+    href: "/ranking",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
