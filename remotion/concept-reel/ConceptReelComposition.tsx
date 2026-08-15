@@ -21,7 +21,7 @@ export const CR_DEFAULT_DURATION_FRAMES = CR_FPS * 6;
 export const CR_TAIL_PADDING_SEC = 2.0;
 
 export type ConceptReelWord = { text: string; start: number; end: number };
-export type ConceptReelMode = "text" | "diagram";
+export type ConceptReelMode = "text" | "scenes" | "diagram";
 
 export type ConceptReelProps = {
   /** Full concept text (used for fallback display and grouping). */
@@ -149,6 +149,8 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
           fallbackText={text}
           hasWords={words.length > 0}
         />
+      ) : mode === "scenes" ? (
+        <ScenesModeBody text={text} words={words} tSec={tSec} />
       ) : (
         <DiagramBody diagramId={diagramId ?? ""} words={words} tSec={tSec} />
       )}
@@ -256,6 +258,139 @@ const GroupText: React.FC<{ group: PhraseGroup; tSec: number }> = ({
         );
       })}
     </p>
+  );
+};
+
+/* ─── Scenes Mode ─────────────────────────────────────────────────────────
+ * Every blank-line-separated paragraph is one scene. The paragraph is the
+ * only text on screen while its narration plays; it fades out and the next
+ * paragraph fades in. Great for punchy 1-sentence/1-line beats.
+ * -------------------------------------------------------------------------- */
+
+type Scene = {
+  text: string;
+  start: number;
+  end: number;
+};
+
+/** Split narration into paragraphs and time each one from the word list. */
+function buildScenes(text: string, words: ConceptReelWord[]): Scene[] {
+  const paragraphs = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length === 0 || words.length === 0) return [];
+
+  // Determine the cumulative word-index range for each paragraph. Both the
+  // narration and the TTS words are tokenized on whitespace, so counts align.
+  const scenes: Scene[] = [];
+  let wordCursor = 0;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const para = paragraphs[i];
+    const tokenCount = para.split(/\s+/).filter(Boolean).length;
+    const startIdx = wordCursor;
+    const endIdx = Math.min(words.length - 1, wordCursor + tokenCount - 1);
+    if (startIdx > words.length - 1) break;
+    const start = words[startIdx].start;
+    const end = words[endIdx].end;
+    scenes.push({ text: para, start, end });
+    wordCursor += tokenCount;
+  }
+  return scenes;
+}
+
+const ScenesModeBody: React.FC<{
+  text: string;
+  words: ConceptReelWord[];
+  tSec: number;
+}> = ({ text, words, tSec }) => {
+  const scenes = React.useMemo(() => buildScenes(text, words), [text, words]);
+
+  const blockW = Math.round(CR_WIDTH * 0.86);
+  const blockX = Math.round((CR_WIDTH - blockW) / 2);
+  const centerY = Math.round(CR_HEIGHT * 0.5);
+
+  // No narration yet — show all paragraphs stacked as a preview.
+  if (words.length === 0 || scenes.length === 0) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: blockX,
+          width: blockW,
+          top: centerY,
+          transform: "translateY(-50%)",
+          textAlign: "center",
+          fontFamily: "'Messina Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          color: "rgba(255,255,255,0.55)",
+          fontSize: 54,
+          fontWeight: 500,
+          lineHeight: 1.28,
+        }}
+      >
+        {text.split(/\n\n+/)[0] || text}
+      </div>
+    );
+  }
+
+  // Find the active scene. Between scenes (during the ~0.15s crossfade) show
+  // the outgoing paragraph fading out.
+  const FADE = 0.22;
+  let activeIdx = -1;
+  for (let i = 0; i < scenes.length; i++) {
+    if (tSec >= scenes[i].start - FADE) activeIdx = i;
+    else break;
+  }
+  if (activeIdx < 0) return null;
+  const scene = scenes[activeIdx];
+  const nextStart = scenes[activeIdx + 1]?.start ?? Infinity;
+
+  // Fade in over FADE seconds starting slightly before this scene's `start`
+  // (so the previous scene's outro overlaps the next scene's intro).
+  const fadeIn = interpolate(
+    tSec,
+    [scene.start - FADE, scene.start + FADE * 0.5],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const fadeOut = interpolate(
+    tSec,
+    [nextStart - FADE, nextStart],
+    [1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const opacity = Math.min(fadeIn, fadeOut);
+  const rise = interpolate(
+    tSec,
+    [scene.start - FADE, scene.start + FADE],
+    [16, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Size the type down for longer paragraphs so they still fit the block.
+  const charCount = scene.text.length;
+  const fontSize =
+    charCount < 40 ? 96 : charCount < 90 ? 78 : charCount < 160 ? 62 : 52;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: blockX,
+        width: blockW,
+        top: centerY,
+        transform: `translateY(calc(-50% + ${rise}px))`,
+        textAlign: "center",
+        fontFamily:
+          "'Messina Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+        fontWeight: 500,
+        color: "#FFFFFF",
+        fontSize,
+        lineHeight: 1.24,
+        letterSpacing: -0.5,
+        opacity,
+        whiteSpace: "pre-wrap",
+      }}
+    >
+      {scene.text}
+    </div>
   );
 };
 
