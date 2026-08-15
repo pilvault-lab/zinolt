@@ -339,7 +339,7 @@ function renderPrimitive(
       return renderVLine(beat.t, beat.label, proj, progress, beat.id);
     case "line":
       if (!proj) return null;
-      return renderLine(beat.points, proj, progress, beat.id);
+      return renderLine(beat, proj, progress);
     case "zone":
       if (!proj) return null;
       return renderZone(beat, proj, progress);
@@ -513,16 +513,13 @@ function renderVLine(
 }
 
 function renderLine(
-  points: ChartPoint[],
+  beat: Extract<Beat, { op: "line" }>,
   proj: Projector,
   progress: number,
-  id?: string,
 ): Primitive {
+  const { points, arrowEnd, id } = beat;
   if (points.length < 2) {
-    return {
-      id: id ?? "",
-      render: () => null,
-    };
+    return { id: id ?? "", render: () => null };
   }
   const pts = points.map((p) => proj.xy(p));
   const totalLen = polylineLength(pts);
@@ -535,19 +532,40 @@ function renderLine(
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
+
+  // Arrowhead at terminal: only render once the line has (mostly) reached the end.
+  const showHead = arrowEnd && progress > 0.9 && drawnPts.length >= 2;
+  let headPath: string | null = null;
+  if (showHead) {
+    const tip = drawnPts[drawnPts.length - 1];
+    const prev = drawnPts[drawnPts.length - 2];
+    const angle = Math.atan2(tip.y - prev.y, tip.x - prev.x);
+    const headScale = Math.min(1, (progress - 0.9) / 0.1);
+    const headLen = 26 * headScale;
+    const spread = Math.PI / 6.5;
+    const h1x = tip.x - headLen * Math.cos(angle - spread);
+    const h1y = tip.y - headLen * Math.sin(angle - spread);
+    const h2x = tip.x - headLen * Math.cos(angle + spread);
+    const h2y = tip.y - headLen * Math.sin(angle + spread);
+    headPath = `M ${tip.x} ${tip.y} L ${h1x} ${h1y} L ${h2x} ${h2y} Z`;
+  }
+
   return {
     id: id ?? "",
     center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
     bbox: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
     render: () => (
-      <path
-        d={d}
-        fill="none"
-        stroke={TEXT_COLOR}
-        strokeWidth={4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <g>
+        <path
+          d={d}
+          fill="none"
+          stroke={TEXT_COLOR}
+          strokeWidth={4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {headPath ? <path d={headPath} fill={TEXT_COLOR} stroke="none" /> : null}
+      </g>
     ),
   };
 }

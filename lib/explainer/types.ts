@@ -59,6 +59,8 @@ export type VLineBeat = BeatBase & {
 export type LineBeat = BeatBase & {
   op: "line";
   points: ChartPoint[];
+  /** Draw an arrowhead at the terminal point once the line finishes drawing. */
+  arrowEnd?: boolean;
 };
 
 export type ZoneBeat = BeatBase & {

@@ -25,7 +25,11 @@ import { existsSync, mkdirSync, writeFileSync, statSync, unlinkSync } from "node
 import { join, resolve } from "node:path";
 import { CONCEPTS, getConcept } from "../lib/explainer/concepts";
 import { synthesizeNarration } from "../lib/tts";
-import { computeConceptReelDurationFrames, CR_FPS } from "../remotion/concept-reel/ConceptReelComposition";
+
+// Kept in sync with remotion/concept-reel/ConceptReelComposition.ts.
+// We hardcode here to avoid pulling @remotion/media (webpack-only) into Node.
+const CR_FPS = 60;
+const CR_TAIL_PADDING_SEC = 2.0;
 
 const ROOT = resolve(join(import.meta.dirname, ".."));
 const AUDIO_DIR = join(ROOT, "public", "concept-reel", "audio");
@@ -130,7 +134,8 @@ async function buildOne(slug: string, voice: string, noRender: boolean): Promise
 
   // 4. Render.
   const outPath = join(OUT_DIR, `${slug}.mp4`);
-  const durationFrames = computeConceptReelDurationFrames(words, CR_FPS);
+  const totalSec = (words.at(-1)?.end ?? 0) + CR_TAIL_PADDING_SEC;
+  const durationFrames = Math.max(CR_FPS, Math.ceil(totalSec * CR_FPS));
   console.log(`  [2/3] rendering ${durationFrames} frames @ ${CR_FPS}fps → ${outPath}`);
   const res = await run(
     "npx",

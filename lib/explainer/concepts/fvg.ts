@@ -103,7 +103,8 @@ export const fvgConcept: ConceptScript = {
       target: "gap",
       durationSec: 1.0,
     },
-    // "...and fill it" — draw the return path landing in the gap.
+    // "...and fill it" — draw the return path landing in the gap, with an
+    // arrowhead at the tip so the direction reads instantly.
     {
       atWord: 42,
       op: "line",
@@ -114,6 +115,7 @@ export const fvgConcept: ConceptScript = {
         { t: 4.4, y: 111 },
         { t: 4.6, y: (C1_HIGH + C3_LOW) / 2 },
       ],
+      arrowEnd: true,
       anim: "draw",
       animDurationSec: 1.0,
     },
