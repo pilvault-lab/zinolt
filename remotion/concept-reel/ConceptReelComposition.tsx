@@ -21,7 +21,7 @@ export const CR_DEFAULT_DURATION_FRAMES = CR_FPS * 6;
 export const CR_TAIL_PADDING_SEC = 2.0;
 
 export type ConceptReelWord = { text: string; start: number; end: number };
-export type ConceptReelMode = "text" | "scenes" | "diagram";
+export type ConceptReelMode = "text" | "diagram";
 
 export type ConceptReelProps = {
   /** Full concept text (used for fallback display and grouping). */
@@ -64,45 +64,39 @@ if (typeof window !== "undefined" && !_messinaLoaded) {
   }
 }
 
-/* ─── Word grouping ───────────────────────────────────────────────────────
- * Group spoken words into readable phrase chunks — ~6-8 words or ~2.6s each,
- * broken on nearby punctuation for natural phrasing.
+/* ─── Paragraph → scene grouping ──────────────────────────────────────────
+ * Every blank-line-separated paragraph is one scene. Within a scene, karaoke
+ * word-highlighting reveals words as they're spoken. Scenes cross-fade at
+ * paragraph boundaries.
+ *
+ * Word indices align 1:1 because both the narration text and the TTS word
+ * list tokenize on whitespace.
  * -------------------------------------------------------------------------- */
-const MAX_WORDS_PER_GROUP = 8;
-const MAX_GROUP_SEC = 2.6;
 
-type PhraseGroup = {
+type Scene = {
   words: ConceptReelWord[];
   start: number;
   end: number;
 };
 
-function groupWords(words: ConceptReelWord[]): PhraseGroup[] {
-  if (words.length === 0) return [];
-  const groups: PhraseGroup[] = [];
-  let current: ConceptReelWord[] = [];
-  const flush = () => {
-    if (current.length === 0) return;
-    groups.push({
-      words: current,
-      start: current[0].start,
-      end: current[current.length - 1].end,
+function buildScenes(text: string, words: ConceptReelWord[]): Scene[] {
+  const paragraphs = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length === 0 || words.length === 0) return [];
+  const scenes: Scene[] = [];
+  let cursor = 0;
+  for (const para of paragraphs) {
+    const tokens = para.split(/\s+/).filter(Boolean);
+    if (cursor >= words.length) break;
+    const slice = words.slice(cursor, cursor + tokens.length);
+    if (slice.length === 0) break;
+    scenes.push({
+      words: slice,
+      start: slice[0].start,
+      end: slice[slice.length - 1].end,
     });
-    current = [];
-  };
-  for (let i = 0; i < words.length; i++) {
-    current.push(words[i]);
-    const spanSec = current[current.length - 1].end - current[0].start;
-    const last = words[i].text.trim();
-    const endsSentence = /[.!?]$/.test(last);
-    const endsClause = /[,;:—]$/.test(last);
-    const atCap = current.length >= MAX_WORDS_PER_GROUP || spanSec >= MAX_GROUP_SEC;
-    if (endsSentence || (endsClause && current.length >= 4) || atCap) {
-      flush();
-    }
+    cursor += tokens.length;
   }
-  flush();
-  return groups;
+  return scenes;
 }
 
 /* ─── Composition ────────────────────────────────────────────────────────── */
@@ -117,18 +111,6 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const tSec = frame / fps;
 
-  const groups = React.useMemo(() => groupWords(words), [words]);
-  const activeGroupIdx = React.useMemo(() => {
-    if (groups.length === 0) return -1;
-    // Find the last group whose start <= tSec.
-    let idx = -1;
-    for (let i = 0; i < groups.length; i++) {
-      if (groups[i].start <= tSec) idx = i;
-      else break;
-    }
-    return idx;
-  }, [groups, tSec]);
-  const activeGroup = activeGroupIdx >= 0 ? groups[activeGroupIdx] : null;
   const totalDurSec = durationInFrames / fps;
 
   return (
@@ -141,16 +123,7 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
       <AmbientGlow tSec={tSec} totalDurSec={totalDurSec} />
 
       {mode === "text" ? (
-        <TextModeBody
-          groups={groups}
-          activeGroupIdx={activeGroupIdx}
-          activeGroup={activeGroup}
-          tSec={tSec}
-          fallbackText={text}
-          hasWords={words.length > 0}
-        />
-      ) : mode === "scenes" ? (
-        <ScenesModeBody text={text} words={words} tSec={tSec} />
+        <TextModeBody text={text} words={words} tSec={tSec} />
       ) : (
         <DiagramBody diagramId={diagramId ?? ""} words={words} tSec={tSec} />
       )}
@@ -158,18 +131,53 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
   );
 };
 
-/* ─── Text Mode ──────────────────────────────────────────────────────────── */
+/* ─── Text Mode — paragraph scenes with karaoke word-reveal inside ──────── */
+
+const SCENE_FADE_SEC = 0.22;
+
 const TextModeBody: React.FC<{
-  groups: PhraseGroup[];
-  activeGroupIdx: number;
-  activeGroup: PhraseGroup | null;
+  text: string;
+  words: ConceptReelWord[];
   tSec: number;
-  fallbackText: string;
-  hasWords: boolean;
-}> = ({ groups, activeGroupIdx, activeGroup, tSec, fallbackText, hasWords }) => {
-  const centerY = Math.round(CR_HEIGHT * 0.5);
+}> = ({ text, words, tSec }) => {
+  const scenes = React.useMemo(() => buildScenes(text, words), [text, words]);
   const blockW = Math.round(CR_WIDTH * 0.86);
   const blockX = Math.round((CR_WIDTH - blockW) / 2);
+  const centerY = Math.round(CR_HEIGHT * 0.5);
+
+  // No narration yet — show the first paragraph as a static preview.
+  if (words.length === 0 || scenes.length === 0) {
+    const firstPara = text.split(/\n\n+/)[0] || text;
+    return (
+      <div
+        style={{
+          position: "absolute",
+          left: blockX,
+          width: blockW,
+          top: centerY,
+          transform: "translateY(-50%)",
+          textAlign: "center",
+          fontFamily: "'Messina Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          color: "rgba(255,255,255,0.55)",
+          fontSize: 62,
+          fontWeight: 500,
+          lineHeight: 1.32,
+        }}
+      >
+        {firstPara}
+      </div>
+    );
+  }
+
+  // Active scene: last scene whose start (minus fade lead-in) has arrived.
+  let activeIdx = -1;
+  for (let i = 0; i < scenes.length; i++) {
+    if (tSec >= scenes[i].start - SCENE_FADE_SEC) activeIdx = i;
+    else break;
+  }
+  if (activeIdx < 0) return null;
+  const scene = scenes[activeIdx];
+  const nextStart = scenes[activeIdx + 1]?.start ?? Infinity;
 
   return (
     <div
@@ -186,58 +194,61 @@ const TextModeBody: React.FC<{
         color: "#FFFFFF",
       }}
     >
-      {!hasWords ? (
-        <p
-          style={{
-            margin: 0,
-            fontSize: 62,
-            lineHeight: 1.32,
-            color: "rgba(255,255,255,0.55)",
-          }}
-        >
-          {fallbackText}
-        </p>
-      ) : activeGroup == null ? null : (
-        <GroupText
-          key={activeGroupIdx}
-          group={activeGroup}
-          tSec={tSec}
-        />
-      )}
+      <SceneText
+        key={activeIdx}
+        scene={scene}
+        nextStart={nextStart}
+        tSec={tSec}
+      />
     </div>
   );
 };
 
-const GroupText: React.FC<{ group: PhraseGroup; tSec: number }> = ({
-  group,
-  tSec,
-}) => {
-  // Fade the group in over 180ms from its start.
-  const groupOpacity = interpolate(
+const SceneText: React.FC<{
+  scene: Scene;
+  nextStart: number;
+  tSec: number;
+}> = ({ scene, nextStart, tSec }) => {
+  // Cross-fade: opacity ramps up around `scene.start`, ramps down around `nextStart`.
+  const fadeIn = interpolate(
     tSec,
-    [group.start, group.start + 0.18],
+    [scene.start - SCENE_FADE_SEC, scene.start + SCENE_FADE_SEC * 0.5],
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
+  const fadeOut = Number.isFinite(nextStart)
+    ? interpolate(
+        tSec,
+        [nextStart - SCENE_FADE_SEC, nextStart],
+        [1, 0],
+        { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+      )
+    : 1;
+  const opacity = Math.min(fadeIn, fadeOut);
   const rise = interpolate(
     tSec,
-    [group.start, group.start + 0.32],
+    [scene.start - SCENE_FADE_SEC, scene.start + SCENE_FADE_SEC],
     [12, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
+
+  // Auto-size the type down for longer paragraphs so they still fit the block.
+  const charCount = scene.words.reduce((n, w) => n + w.text.length + 1, 0);
+  const fontSize =
+    charCount < 40 ? 92 : charCount < 90 ? 78 : charCount < 160 ? 64 : 54;
 
   return (
     <p
       style={{
         margin: 0,
-        fontSize: 78,
+        fontSize,
         lineHeight: 1.24,
         letterSpacing: -0.5,
-        opacity: groupOpacity,
+        opacity,
         transform: `translateY(${rise}px)`,
       }}
     >
-      {group.words.map((w, i) => {
+      {scene.words.map((w, i) => {
         const isSpoken = tSec >= w.start;
         const isActive = tSec >= w.start && tSec < w.end + 0.05;
         return (
@@ -245,7 +256,6 @@ const GroupText: React.FC<{ group: PhraseGroup; tSec: number }> = ({
             <span
               style={{
                 color: isSpoken ? "#FFFFFF" : "rgba(255,255,255,0.30)",
-                transition: "none",
                 textShadow: isActive
                   ? "0 0 24px rgba(255,255,255,0.35)"
                   : "none",
@@ -253,144 +263,11 @@ const GroupText: React.FC<{ group: PhraseGroup; tSec: number }> = ({
             >
               {w.text}
             </span>
-            {i < group.words.length - 1 ? " " : ""}
+            {i < scene.words.length - 1 ? " " : ""}
           </React.Fragment>
         );
       })}
     </p>
-  );
-};
-
-/* ─── Scenes Mode ─────────────────────────────────────────────────────────
- * Every blank-line-separated paragraph is one scene. The paragraph is the
- * only text on screen while its narration plays; it fades out and the next
- * paragraph fades in. Great for punchy 1-sentence/1-line beats.
- * -------------------------------------------------------------------------- */
-
-type Scene = {
-  text: string;
-  start: number;
-  end: number;
-};
-
-/** Split narration into paragraphs and time each one from the word list. */
-function buildScenes(text: string, words: ConceptReelWord[]): Scene[] {
-  const paragraphs = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-  if (paragraphs.length === 0 || words.length === 0) return [];
-
-  // Determine the cumulative word-index range for each paragraph. Both the
-  // narration and the TTS words are tokenized on whitespace, so counts align.
-  const scenes: Scene[] = [];
-  let wordCursor = 0;
-  for (let i = 0; i < paragraphs.length; i++) {
-    const para = paragraphs[i];
-    const tokenCount = para.split(/\s+/).filter(Boolean).length;
-    const startIdx = wordCursor;
-    const endIdx = Math.min(words.length - 1, wordCursor + tokenCount - 1);
-    if (startIdx > words.length - 1) break;
-    const start = words[startIdx].start;
-    const end = words[endIdx].end;
-    scenes.push({ text: para, start, end });
-    wordCursor += tokenCount;
-  }
-  return scenes;
-}
-
-const ScenesModeBody: React.FC<{
-  text: string;
-  words: ConceptReelWord[];
-  tSec: number;
-}> = ({ text, words, tSec }) => {
-  const scenes = React.useMemo(() => buildScenes(text, words), [text, words]);
-
-  const blockW = Math.round(CR_WIDTH * 0.86);
-  const blockX = Math.round((CR_WIDTH - blockW) / 2);
-  const centerY = Math.round(CR_HEIGHT * 0.5);
-
-  // No narration yet — show all paragraphs stacked as a preview.
-  if (words.length === 0 || scenes.length === 0) {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          left: blockX,
-          width: blockW,
-          top: centerY,
-          transform: "translateY(-50%)",
-          textAlign: "center",
-          fontFamily: "'Messina Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
-          color: "rgba(255,255,255,0.55)",
-          fontSize: 54,
-          fontWeight: 500,
-          lineHeight: 1.28,
-        }}
-      >
-        {text.split(/\n\n+/)[0] || text}
-      </div>
-    );
-  }
-
-  // Find the active scene. Between scenes (during the ~0.15s crossfade) show
-  // the outgoing paragraph fading out.
-  const FADE = 0.22;
-  let activeIdx = -1;
-  for (let i = 0; i < scenes.length; i++) {
-    if (tSec >= scenes[i].start - FADE) activeIdx = i;
-    else break;
-  }
-  if (activeIdx < 0) return null;
-  const scene = scenes[activeIdx];
-  const nextStart = scenes[activeIdx + 1]?.start ?? Infinity;
-
-  // Fade in over FADE seconds starting slightly before this scene's `start`
-  // (so the previous scene's outro overlaps the next scene's intro).
-  const fadeIn = interpolate(
-    tSec,
-    [scene.start - FADE, scene.start + FADE * 0.5],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-  const fadeOut = interpolate(
-    tSec,
-    [nextStart - FADE, nextStart],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-  const opacity = Math.min(fadeIn, fadeOut);
-  const rise = interpolate(
-    tSec,
-    [scene.start - FADE, scene.start + FADE],
-    [16, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-
-  // Size the type down for longer paragraphs so they still fit the block.
-  const charCount = scene.text.length;
-  const fontSize =
-    charCount < 40 ? 96 : charCount < 90 ? 78 : charCount < 160 ? 62 : 52;
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: blockX,
-        width: blockW,
-        top: centerY,
-        transform: `translateY(calc(-50% + ${rise}px))`,
-        textAlign: "center",
-        fontFamily:
-          "'Messina Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
-        fontWeight: 500,
-        color: "#FFFFFF",
-        fontSize,
-        lineHeight: 1.24,
-        letterSpacing: -0.5,
-        opacity,
-        whiteSpace: "pre-wrap",
-      }}
-    >
-      {scene.text}
-    </div>
   );
 };
 

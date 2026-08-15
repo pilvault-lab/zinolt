@@ -129,6 +129,7 @@ async function buildOne(
   noRender: boolean,
   emailTo: string | undefined,
   shouldEmail: boolean,
+  mode: "text" | "diagram",
 ): Promise<boolean> {
   const script = getConcept(slug);
   if (!script) {
@@ -161,8 +162,8 @@ async function buildOne(
     text: script.narration,
     words,
     audioSrc: audioRel,
-    mode: "diagram" as const,
-    diagramId: slug,
+    mode,
+    diagramId: mode === "diagram" ? slug : "",
   };
   writeFileSync(propsPath, JSON.stringify(props), "utf8");
 
@@ -250,6 +251,9 @@ async function main() {
   // --email address  → send to that specific address
   const shouldEmail = Boolean(args.email);
   const emailTo = typeof args.email === "string" ? args.email : undefined;
+  const mode = ((args.mode as string) === "text" ? "text" : "diagram") as
+    | "text"
+    | "diagram";
 
   let slugs: string[];
   if (args.all) {
@@ -274,7 +278,7 @@ async function main() {
 
   let failed = 0;
   for (const slug of slugs) {
-    const ok = await buildOne(slug, voice, noRender, emailTo, shouldEmail);
+    const ok = await buildOne(slug, voice, noRender, emailTo, shouldEmail, mode);
     if (!ok) failed++;
   }
   if (failed > 0) {

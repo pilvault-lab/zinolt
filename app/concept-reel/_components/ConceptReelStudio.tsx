@@ -267,8 +267,8 @@ export const ConceptReelStudio: React.FC = () => {
               className="font-sans text-[11px] leading-snug"
               style={{ color: BRAND.colors.grey500 }}
             >
-              First spoken line is the hook — no dead intro card.
-              {mode === "scenes" ? " Blank line between paragraphs → each becomes its own scene." : ""}
+              First spoken line is the hook — no dead intro card. Blank line
+              between paragraphs → each becomes its own scene.
             </p>
             <textarea
               id="cr-text"
@@ -295,9 +295,9 @@ export const ConceptReelStudio: React.FC = () => {
               Mode
             </span>
             <div className="flex gap-2">
-              {(["text", "scenes", "diagram"] as ConceptReelMode[]).map((m) => {
+              {(["text", "diagram"] as ConceptReelMode[]).map((m) => {
                 const active = mode === m;
-                const label = m === "text" ? "Text" : m === "scenes" ? "Scenes" : "Diagram";
+                const label = m === "text" ? "Text" : "Diagram";
                 return (
                   <button
                     key={m}
