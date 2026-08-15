@@ -40,6 +40,16 @@ import {
   RK_TOTAL_FRAMES,
   RK_WIDTH,
 } from "./ranking/Ranking";
+import {
+  ConceptReelComposition,
+  conceptReelDefaultProps,
+  computeConceptReelDurationFrames,
+  CR_FPS,
+  CR_HEIGHT,
+  CR_WIDTH,
+  CR_DEFAULT_DURATION_FRAMES,
+  type ConceptReelProps,
+} from "./concept-reel/ConceptReelComposition";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -94,7 +104,8 @@ export const RemotionRoot: React.FC = () => (
         t.id !== "time-machine" &&
         t.id !== "daily-movers" &&
         t.id !== "story-card" &&
-        t.id !== "ranking",
+        t.id !== "ranking" &&
+        t.id !== "concept-reel",
     ).map((t) => (
       <Composition
         key={t.compositionId}
@@ -107,6 +118,24 @@ export const RemotionRoot: React.FC = () => (
         defaultProps={{ ...reelDefaultProps, backgroundSrc: t.background }}
       />
     ))}
+    <Composition
+      id="ConceptReel"
+      component={ConceptReelComposition}
+      durationInFrames={CR_DEFAULT_DURATION_FRAMES}
+      fps={CR_FPS}
+      width={CR_WIDTH}
+      height={CR_HEIGHT}
+      defaultProps={conceptReelDefaultProps}
+      calculateMetadata={({ props }) => {
+        const p = props as ConceptReelProps;
+        return {
+          durationInFrames: computeConceptReelDurationFrames(p.words, CR_FPS),
+          fps: CR_FPS,
+          width: CR_WIDTH,
+          height: CR_HEIGHT,
+        };
+      }}
+    />
     <Composition
       id="StoryCard"
       component={StoryCardComposition}
