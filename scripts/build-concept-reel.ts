@@ -25,6 +25,7 @@ import { existsSync, mkdirSync, writeFileSync, statSync, unlinkSync } from "node
 import { join, resolve } from "node:path";
 import { CONCEPTS, getConcept } from "../lib/explainer/concepts";
 import { synthesizeNarration } from "../lib/tts";
+import { fileAsAttachment, isEmailConfigured, sendEmail } from "../lib/mail";
 
 // Kept in sync with remotion/concept-reel/ConceptReelComposition.ts.
 // We hardcode here to avoid pulling @remotion/media (webpack-only) into Node.
@@ -90,7 +91,45 @@ function run(
   });
 }
 
-async function buildOne(slug: string, voice: string, noRender: boolean): Promise<boolean> {
+async function emailVideo(
+  slug: string,
+  label: string,
+  mp4Path: string,
+  to: string | undefined,
+): Promise<boolean> {
+  if (!isEmailConfigured()) {
+    console.error(
+      "  ✗ email requested but not configured — set RESEND_API_KEY + EMAIL_FROM (+ EMAIL_TO)",
+    );
+    return false;
+  }
+  try {
+    const attachment = fileAsAttachment(mp4Path, "video/mp4");
+    const sizeMb = (Buffer.byteLength(attachment.content, "base64") / 1e6).toFixed(2);
+    console.log(`  [3/3] emailing ${sizeMb} MB → ${to ?? process.env.EMAIL_TO ?? "(EMAIL_TO)"}`);
+    const { id } = await sendEmail({
+      to,
+      subject: `Concept Reel — ${label}`,
+      html: `<p>Fresh <strong>${label}</strong> reel attached (${sizeMb} MB).</p><p>Slug: <code>${slug}</code></p>`,
+      text: `Fresh ${label} reel attached (${sizeMb} MB). Slug: ${slug}`,
+      attachments: [attachment],
+    });
+    console.log(`    ✓ sent (resend id: ${id})`);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`  ✗ email failed: ${msg}`);
+    return false;
+  }
+}
+
+async function buildOne(
+  slug: string,
+  voice: string,
+  noRender: boolean,
+  emailTo: string | undefined,
+  shouldEmail: boolean,
+): Promise<boolean> {
   const script = getConcept(slug);
   if (!script) {
     console.error(`  ✗ no concept registered with id "${slug}"`);
@@ -166,13 +205,51 @@ async function buildOne(slug: string, voice: string, noRender: boolean): Promise
     return false;
   }
   console.log(`  ✓ ${outPath} (${(statSync(outPath).size / 1e6).toFixed(1)} MB)`);
+
+  if (shouldEmail) {
+    const ok = await emailVideo(slug, script.label, outPath, emailTo);
+    if (!ok) return false;
+  }
   return true;
 }
 
+/** Load .env.local into process.env — the build script runs outside Next.js. */
+function loadEnvLocal() {
+  try {
+    const content = readEnvFile(".env.local");
+    for (const [k, v] of Object.entries(content)) {
+      if (process.env[k] === undefined) process.env[k] = v;
+    }
+  } catch {
+    // no .env.local — env may already be set another way, fine.
+  }
+}
+
+function readEnvFile(path: string): Record<string, string> {
+  const raw = require("node:fs").readFileSync(path, "utf8") as string;
+  const out: Record<string, string> = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
+    if (!m) continue;
+    let value = m[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    out[m[1]] = value;
+  }
+  return out;
+}
+
 async function main() {
+  loadEnvLocal();
+
   const args = parseArgs(process.argv.slice(2));
   const voice = (args.voice as string) || DEFAULT_VOICE;
   const noRender = Boolean(args["no-render"]);
+  // --email          → send to EMAIL_TO env var
+  // --email address  → send to that specific address
+  const shouldEmail = Boolean(args.email);
+  const emailTo = typeof args.email === "string" ? args.email : undefined;
 
   let slugs: string[];
   if (args.all) {
@@ -181,16 +258,23 @@ async function main() {
     slugs = [args.concept];
   } else {
     console.error(
-      "Usage: build-concept-reel.ts --concept <slug> [--voice <name>] [--no-render]",
+      "Usage: build-concept-reel.ts --concept <slug> [--voice <name>] [--no-render] [--email [address]]",
     );
-    console.error("       build-concept-reel.ts --all");
+    console.error("       build-concept-reel.ts --all [--email [address]]");
     console.error(`\nKnown concepts: ${CONCEPTS.map((c) => c.id).join(", ")}`);
+    process.exit(1);
+  }
+
+  if (shouldEmail && !isEmailConfigured()) {
+    console.error(
+      "\n✗ --email requires RESEND_API_KEY and EMAIL_FROM in .env.local (see lib/mail.ts).",
+    );
     process.exit(1);
   }
 
   let failed = 0;
   for (const slug of slugs) {
-    const ok = await buildOne(slug, voice, noRender);
+    const ok = await buildOne(slug, voice, noRender, emailTo, shouldEmail);
     if (!ok) failed++;
   }
   if (failed > 0) {
