@@ -245,10 +245,10 @@ export const ConceptReelStudio: React.FC = () => {
     >
       <Header />
 
-      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
-        {/* LEFT — inputs */}
+      <div className="flex flex-col md:flex-1 md:min-h-0 md:flex-row">
+        {/* LEFT — inputs. Mobile: flows in document scroll. Desktop: fixed column with internal scroll. */}
         <aside
-          className="flex flex-col gap-6 p-6 overflow-y-auto border-b md:overflow-y-auto md:w-[320px] md:border-b-0 md:border-r"
+          className="flex flex-col gap-6 p-6 border-b md:overflow-y-auto md:w-[320px] md:border-b-0 md:border-r"
           style={{
             backgroundColor: BRAND.colors.paper,
             borderColor: BRAND.colors.grey200,
