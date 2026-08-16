@@ -12,6 +12,8 @@ import {
   conceptReelDefaultProps,
   computeConceptReelDurationFrames,
   CR_FPS,
+  CR_EXPORT_FPS_FAST,
+  CR_EXPORT_FPS_FULL,
   CR_WIDTH,
   CR_HEIGHT,
   type ConceptReelProps,
@@ -63,6 +65,7 @@ export const ConceptReelStudio: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [canExport, setCanExport] = useState<boolean | null>(null);
   const [exportError, setExportError] = useState("");
+  const [exportFullFps, setExportFullFps] = useState(false);
 
   const [playerDims, setPlayerDims] = useState({
     w: PLAYER_WIDTH,
@@ -184,20 +187,25 @@ export const ConceptReelStudio: React.FC = () => {
     setIsRendering(true);
     setProgress(0);
     try {
+      const exportFps = exportFullFps ? CR_EXPORT_FPS_FULL : CR_EXPORT_FPS_FAST;
+      const exportFrames = computeConceptReelDurationFrames(
+        currentProps.words,
+        exportFps,
+      );
       const { getBlob } = await renderMediaOnWeb({
         composition: {
           id: "ConceptReel",
           component: ConceptReelComposition,
-          durationInFrames: durationFrames,
-          fps: CR_FPS,
+          durationInFrames: exportFrames,
+          fps: exportFps,
           width: CR_WIDTH,
           height: CR_HEIGHT,
           defaultProps: conceptReelDefaultProps,
           calculateMetadata: () => ({
             width: CR_WIDTH,
             height: CR_HEIGHT,
-            durationInFrames: durationFrames,
-            fps: CR_FPS,
+            durationInFrames: exportFrames,
+            fps: exportFps,
           }),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
@@ -235,7 +243,7 @@ export const ConceptReelStudio: React.FC = () => {
     } finally {
       setIsRendering(false);
     }
-  }, [narration, currentProps, durationFrames]);
+  }, [narration, currentProps, exportFullFps]);
 
   const narrationReady = Boolean(narration);
   const narrationStale = narration != null && narration.key !== cacheKey;
@@ -450,6 +458,28 @@ export const ConceptReelStudio: React.FC = () => {
               ? `Rendering… ${Math.round(progress * 100)}%`
               : "Download video"}
           </Button>
+
+          {/* Speed / quality toggle. Fast = 30fps (~½ render time). */}
+          <label
+            className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 font-sans text-xs cursor-pointer"
+            style={{
+              borderColor: BRAND.colors.grey200,
+              color: BRAND.colors.ink,
+            }}
+          >
+            <span className="flex flex-col leading-tight">
+              <span style={{ fontWeight: 600 }}>Full 60fps export</span>
+              <span style={{ color: BRAND.colors.grey500 }}>
+                ~2× slower to render
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={exportFullFps}
+              onChange={(e) => setExportFullFps(e.target.checked)}
+              disabled={isRendering}
+            />
+          </label>
 
           {!narrationReady && (
             <p

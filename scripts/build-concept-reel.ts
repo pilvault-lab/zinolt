@@ -29,8 +29,8 @@ import { fileAsAttachment, isEmailConfigured, sendEmail } from "../lib/mail";
 
 // Kept in sync with remotion/concept-reel/ConceptReelComposition.ts.
 // We hardcode here to avoid pulling @remotion/media (webpack-only) into Node.
-const CR_FPS = 30;
 const CR_TAIL_PADDING_SEC = 2.0;
+const DEFAULT_EXPORT_FPS = 30; // Fast export. Override with --fps 60.
 
 const ROOT = resolve(join(import.meta.dirname, ".."));
 const AUDIO_DIR = join(ROOT, "public", "concept-reel", "audio");
@@ -130,6 +130,7 @@ async function buildOne(
   emailTo: string | undefined,
   shouldEmail: boolean,
   mode: "text" | "diagram",
+  fps: number,
 ): Promise<boolean> {
   const script = getConcept(slug);
   if (!script) {
@@ -164,6 +165,7 @@ async function buildOne(
     audioSrc: audioRel,
     mode,
     diagramId: mode === "diagram" ? slug : "",
+    fpsOverride: fps,
   };
   writeFileSync(propsPath, JSON.stringify(props), "utf8");
 
@@ -175,8 +177,8 @@ async function buildOne(
   // 4. Render.
   const outPath = join(OUT_DIR, `${slug}.mp4`);
   const totalSec = (words.at(-1)?.end ?? 0) + CR_TAIL_PADDING_SEC;
-  const durationFrames = Math.max(CR_FPS, Math.ceil(totalSec * CR_FPS));
-  console.log(`  [2/3] rendering ${durationFrames} frames @ ${CR_FPS}fps → ${outPath}`);
+  const durationFrames = Math.max(fps, Math.ceil(totalSec * fps));
+  console.log(`  [2/3] rendering ${durationFrames} frames @ ${fps}fps → ${outPath}`);
   const res = await run(
     "npx",
     [
@@ -188,6 +190,8 @@ async function buildOne(
       propsPath,
       "--codec",
       "h264",
+      "--frames",
+      `0-${durationFrames - 1}`,
     ],
     {
       timeoutMs: 20 * 60 * 1000,
@@ -254,6 +258,11 @@ async function main() {
   const mode = ((args.mode as string) === "text" ? "text" : "diagram") as
     | "text"
     | "diagram";
+  const fps = args.fps ? Number(args.fps) : DEFAULT_EXPORT_FPS;
+  if (!Number.isFinite(fps) || fps <= 0) {
+    console.error(`✗ invalid --fps ${args.fps}`);
+    process.exit(1);
+  }
 
   let slugs: string[];
   if (args.all) {
@@ -278,7 +287,7 @@ async function main() {
 
   let failed = 0;
   for (const slug of slugs) {
-    const ok = await buildOne(slug, voice, noRender, emailTo, shouldEmail, mode);
+    const ok = await buildOne(slug, voice, noRender, emailTo, shouldEmail, mode, fps);
     if (!ok) failed++;
   }
   if (failed > 0) {

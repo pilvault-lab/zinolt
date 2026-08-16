@@ -29,9 +29,10 @@ const Root: React.FC = () => (
     defaultProps={conceptReelDefaultProps}
     calculateMetadata={({ props }) => {
       const p = props as ConceptReelProps;
+      const fps = p.fpsOverride && p.fpsOverride > 0 ? p.fpsOverride : CR_FPS;
       return {
-        durationInFrames: computeConceptReelDurationFrames(p.words, CR_FPS),
-        fps: CR_FPS,
+        durationInFrames: computeConceptReelDurationFrames(p.words, fps),
+        fps,
         width: CR_WIDTH,
         height: CR_HEIGHT,
       };

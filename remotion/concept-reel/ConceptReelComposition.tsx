@@ -10,9 +10,13 @@ import { Audio as MediaAudio } from "@remotion/media";
 import { Explainer } from "./Explainer";
 import { getConcept } from "@/lib/explainer/concepts";
 
-// 30fps: for narrated text + chart animations the difference from 60fps is
-// invisible, and render time (both in-browser and CLI) is ~½.
-export const CR_FPS = 30;
+// Composition runs at 60fps — buttery for the in-studio preview. Exports
+// default to CR_EXPORT_FPS_FAST (30fps) because the browser-side renderer
+// has to encode every frame; a "Full 60fps" toggle lets you double the
+// export cost when you want max smoothness in the mp4.
+export const CR_FPS = 60;
+export const CR_EXPORT_FPS_FAST = 30;
+export const CR_EXPORT_FPS_FULL = 60;
 export const CR_WIDTH = 1080;
 export const CR_HEIGHT = 1920;
 
@@ -38,6 +42,8 @@ export type ConceptReelProps = {
   mode: ConceptReelMode;
   /** Optional diagram script id for diagram mode (stub for now). */
   diagramId?: string;
+  /** Optional fps override — CLI passes this to render at a different rate than CR_FPS. */
+  fpsOverride?: number;
 };
 
 export const conceptReelDefaultProps: ConceptReelProps = {
@@ -347,8 +353,8 @@ export function computeConceptReelDurationFrames(
   words: ConceptReelWord[] | undefined,
   fps: number = CR_FPS,
 ): number {
-  if (!words || words.length === 0) return CR_DEFAULT_DURATION_FRAMES;
+  if (!words || words.length === 0) return Math.max(fps, CR_FPS * 6);
   const last = words[words.length - 1];
   const totalSec = last.end + CR_TAIL_PADDING_SEC;
-  return Math.max(CR_FPS, Math.ceil(totalSec * fps));
+  return Math.max(fps, Math.ceil(totalSec * fps));
 }
