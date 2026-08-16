@@ -29,7 +29,7 @@ import { fileAsAttachment, isEmailConfigured, sendEmail } from "../lib/mail";
 
 // Kept in sync with remotion/concept-reel/ConceptReelComposition.ts.
 // We hardcode here to avoid pulling @remotion/media (webpack-only) into Node.
-const CR_FPS = 60;
+const CR_FPS = 30;
 const CR_TAIL_PADDING_SEC = 2.0;
 
 const ROOT = resolve(join(import.meta.dirname, ".."));

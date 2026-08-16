@@ -10,7 +10,9 @@ import { Audio as MediaAudio } from "@remotion/media";
 import { Explainer } from "./Explainer";
 import { getConcept } from "@/lib/explainer/concepts";
 
-export const CR_FPS = 60;
+// 30fps: for narrated text + chart animations the difference from 60fps is
+// invisible, and render time (both in-browser and CLI) is ~½.
+export const CR_FPS = 30;
 export const CR_WIDTH = 1080;
 export const CR_HEIGHT = 1920;
 

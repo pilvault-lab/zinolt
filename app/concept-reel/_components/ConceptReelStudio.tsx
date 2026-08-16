@@ -205,7 +205,9 @@ export const ConceptReelStudio: React.FC = () => {
         inputProps: currentProps as any,
         licenseKey: "free-license",
         videoCodec: "h264",
-        videoBitrate: 12_000_000,
+        // 6 Mbps is plenty for 1080p text + chart video — halves file size
+        // (faster to write on mobile) with no visible quality loss.
+        videoBitrate: 6_000_000,
         audioCodec: "aac",
         hardwareAcceleration: "prefer-hardware",
         keyframeIntervalInSeconds: 2,
