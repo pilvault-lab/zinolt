@@ -85,10 +85,12 @@ export const HypeEditComposition: React.FC<HypeEditProps> = ({
     <AbsoluteFill style={{ backgroundColor: "#000000" }}>
       {resolvedAudio ? <MediaAudio src={resolvedAudio} /> : null}
 
-      {/* Full-bleed 9:16 stage — no letterbox */}
+      {/* Full-bleed 9:16 stage — no letterbox. Key by frame id (not cut
+       *  index) so a repeating video isn't remounted every beat, which
+       *  churns the decoder and hitches the track audio. */}
       {activeFrame ? (
         <FrameLayer
-          key={cutIdx}
+          key={activeFrame.id}
           frame={activeFrame}
           transition={transition}
           elapsedSec={activeElapsed}
@@ -151,11 +153,15 @@ const FrameLayer: React.FC<{
           }}
         />
       ) : frame.kind === "video" && frame.src ? (
+        // Video frames are silent — only the track audio (<MediaAudio>)
+        // should play. `muted` + `volume={0}` is deliberate belt-and-braces
+        // so no decoder mixes source audio into the composition.
         forRender ? (
           <MediaVideo
             src={resolveSrc(frame.src)}
             trimBefore={frame.startAt ? Math.round(frame.startAt * 60) : 0}
             muted
+            volume={0}
             style={mediaStyle}
             onError={() => "fallback" as const}
           />
@@ -164,6 +170,7 @@ const FrameLayer: React.FC<{
             src={resolveSrc(frame.src)}
             trimBefore={frame.startAt ? Math.round(frame.startAt * 60) : 0}
             muted
+            volume={0}
             style={mediaStyle}
             onError={() => {}}
           />
