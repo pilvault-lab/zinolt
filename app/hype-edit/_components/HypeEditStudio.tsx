@@ -39,6 +39,8 @@ import { UI, useMediaQuery } from "./ui";
 import type { UITrack } from "./AudioPanel";
 
 const DEFAULT_BPM = 120;
+/** Hard cap on the exported edit length in seconds — long tracks are trimmed. */
+const MAX_EDIT_SEC = 15;
 
 export const HypeEditStudio: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -111,7 +113,10 @@ export const HypeEditStudio: React.FC = () => {
     el.src = src;
     const onMeta = () => {
       const d = el.duration;
-      if (Number.isFinite(d) && d > 0) setDurationSec(d);
+      if (Number.isFinite(d) && d > 0) {
+        // Cap the edit to MAX_EDIT_SEC — longer tracks get trimmed.
+        setDurationSec(Math.min(d, MAX_EDIT_SEC));
+      }
     };
     el.addEventListener("loadedmetadata", onMeta);
     return () => el.removeEventListener("loadedmetadata", onMeta);

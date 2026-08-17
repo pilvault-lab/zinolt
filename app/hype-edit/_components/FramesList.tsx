@@ -13,22 +13,36 @@ type Props = {
 
 type Dims = { w: number; h: number };
 
-/** Composition is 1080×1920. Hard bar: every source must be at least
- *  1920×1080 (or 1080×1920) — i.e. long side ≥ 1920 AND short side ≥ 1080.
- *  Anything below gets flagged as low res. */
-const MIN_LONG = 1920;
-const MIN_SHORT = 1080;
+/** Composition is 1080×1920. Hard bar per source kind:
+ *   image → long side ≥ 1920 AND short side ≥ 1080 (1920×1080 minimum)
+ *   video → long side ≥ 1280 AND short side ≥ 720  (720p minimum)
+ *  Anything below → red LOW RES flag. */
 const CANVAS_W = 1080;
 const CANVAS_H = 1920;
+const IMG_MIN_LONG = 1920;
+const IMG_MIN_SHORT = 1080;
+const VID_MIN_LONG = 1280;
+const VID_MIN_SHORT = 720;
 
-function isLowRes(d: Dims): boolean {
-  const long = Math.max(d.w, d.h);
-  const short = Math.min(d.w, d.h);
-  return long < MIN_LONG || short < MIN_SHORT;
+function minsFor(kind: "image" | "video" | "solid"): { long: number; short: number } {
+  return kind === "video"
+    ? { long: VID_MIN_LONG, short: VID_MIN_SHORT }
+    : { long: IMG_MIN_LONG, short: IMG_MIN_SHORT };
+}
+
+function isLowRes(d: Dims, kind: "image" | "video" | "solid"): boolean {
+  const { long, short } = minsFor(kind);
+  const l = Math.max(d.w, d.h);
+  const s = Math.min(d.w, d.h);
+  return l < long || s < short;
 }
 
 function upscaleFactor(d: Dims): number {
   return Math.max(CANVAS_W / d.w, CANVAS_H / d.h);
+}
+
+function minLabel(kind: "image" | "video" | "solid"): string {
+  return kind === "video" ? "1280×720" : "1920×1080";
 }
 
 function resolveSrc(src: string): string {
@@ -106,7 +120,8 @@ export const FramesList: React.FC<Props> = ({
         {frames.map((f, i) => {
           const d = dims[f.id];
           const scale = d ? upscaleFactor(d) : 0;
-          const lowRes = d ? isLowRes(d) : false;
+          const lowRes = d ? isLowRes(d, f.kind) : false;
+          const minStr = minLabel(f.kind);
           return (
             <div
               key={f.id}
@@ -177,7 +192,7 @@ export const FramesList: React.FC<Props> = ({
                   <span>#{i + 1} · {typeLabel(f)}</span>
                   {lowRes ? (
                     <span
-                      title={`Below 1920×1080 minimum · needs ${scale.toFixed(2)}× upscale to fill 1080×1920`}
+                      title={`Below ${minStr} minimum · needs ${scale.toFixed(2)}× upscale to fill 1080×1920`}
                       style={{
                         fontSize: 9.5,
                         fontWeight: 700,
@@ -207,7 +222,7 @@ export const FramesList: React.FC<Props> = ({
                       : d
                       ? `${d.w} × ${d.h}${
                           lowRes
-                            ? ` · below 1920×1080 · needs ${scale.toFixed(
+                            ? ` · below ${minStr} · needs ${scale.toFixed(
                                 2,
                               )}× upscale`
                             : ""
@@ -313,7 +328,8 @@ const Lightbox: React.FC<{
   if (!frame.src) return null;
   const src = resolveSrc(frame.src);
   const scale = dims ? upscaleFactor(dims) : 0;
-  const lowRes = dims ? isLowRes(dims) : false;
+  const lowRes = dims ? isLowRes(dims, frame.kind) : false;
+  const minStr = minLabel(frame.kind);
   return (
     <div
       onClick={onClose}
@@ -384,7 +400,7 @@ const Lightbox: React.FC<{
                   fontWeight: 700,
                 }}
               >
-                LOW RES · below 1920×1080 (needs {scale.toFixed(2)}× upscale)
+                LOW RES · below {minStr} (needs {scale.toFixed(2)}× upscale)
               </span>
             ) : null}
           </>
