@@ -35,12 +35,14 @@ import { TopBar } from "./TopBar";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightPanel } from "./RightPanel";
 import { Transport } from "./Transport";
-import { UI } from "./ui";
+import { UI, useMediaQuery } from "./ui";
 import type { UITrack } from "./AudioPanel";
 
 const DEFAULT_BPM = 120;
 
 export const HypeEditStudio: React.FC = () => {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+
   /* ─── Project state ────────────────────────────────────────────────── */
   const [project, setProject] = useState<HypeProject>(EMPTY_PROJECT);
   useEffect(() => {
@@ -67,8 +69,20 @@ export const HypeEditStudio: React.FC = () => {
     fetch("/api/hype-edit/audio", { cache: "no-store" })
       .then((r) => r.json() as Promise<{ presets: UITrack[]; custom: UITrack[] }>)
       .then((d) => {
-        setPresets(d.presets ?? []);
-        setCustom(d.custom ?? []);
+        const p = d.presets ?? [];
+        const c = d.custom ?? [];
+        setPresets(p);
+        setCustom(c);
+        // Reconcile: if a persisted audioFile no longer exists on disk,
+        // clear it so we don't 404 on the <audio>/composition <MediaAudio>.
+        setProject((prev) => {
+          if (!prev.audioFile) return prev;
+          const exists =
+            p.some((t) => t.file === prev.audioFile) ||
+            c.some((t) => t.file === prev.audioFile);
+          if (exists) return prev;
+          return { ...prev, audioFile: "" };
+        });
       })
       .catch(() => {});
   }, []);
@@ -170,10 +184,10 @@ export const HypeEditStudio: React.FC = () => {
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      const padX = 24;
-      const padY = 24;
-      const maxW = r.width - padX * 2;
-      const maxH = r.height - padY * 2;
+      const pad = isMobile ? 8 : 24;
+      const maxW = r.width - pad * 2;
+      const maxH = r.height - pad * 2;
+      if (maxW <= 0 || maxH <= 0) return;
       const wByH = (maxH * HE_WIDTH) / HE_HEIGHT;
       const w = Math.min(maxW, wByH);
       const h = (w * HE_HEIGHT) / HE_WIDTH;
@@ -183,7 +197,7 @@ export const HypeEditStudio: React.FC = () => {
     ro.observe(el);
     measure();
     return () => ro.disconnect();
-  }, []);
+  }, [isMobile]);
 
   /* ─── Frames CRUD ──────────────────────────────────────────────────── */
   const addFrame = useCallback((f: HypeFrame) => {
@@ -199,6 +213,18 @@ export const HypeEditStudio: React.FC = () => {
   };
   const reorderFrames = (n: HypeFrame[]) =>
     setProject((prev) => ({ ...prev, frames: n }));
+  const clearFrames = () => {
+    setProject((prev) => {
+      // Best-effort: release blob URLs + drop IDB entries for session frames.
+      for (const f of prev.frames) {
+        if (f.session) {
+          if (f.src && f.src.startsWith("blob:")) URL.revokeObjectURL(f.src);
+          void deleteBlob(f.id);
+        }
+      }
+      return { ...prev, frames: [] };
+    });
+  };
 
   /* ─── Ingest files from upload / drag-drop / paste ─────────────────── */
   const ingestFiles = useCallback(
@@ -392,21 +418,97 @@ export const HypeEditStudio: React.FC = () => {
   }, [downloadDisabled, project.settings, durationSec, inputProps]);
 
   /* ─── Render ───────────────────────────────────────────────────────── */
+  const stage = (
+    <div
+      ref={stageRef}
+      style={{
+        background: UI.stageBg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 0,
+        minHeight: 0,
+        overflow: "hidden",
+        // On mobile the stage is one row of a scrolling column, so cap it
+        // so the transport + panels are visible without scrolling first.
+        ...(isMobile ? { aspectRatio: "9 / 16", maxHeight: "55vh" } : {}),
+      }}
+    >
+      <div
+        style={{
+          width: playerDims.w,
+          height: playerDims.h,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+          borderRadius: 4,
+          overflow: "hidden",
+          background: "#000",
+        }}
+      >
+        <Player
+          ref={playerRef}
+          component={HypeEditComposition}
+          compositionWidth={HE_WIDTH}
+          compositionHeight={HE_HEIGHT}
+          durationInFrames={durationFrames}
+          fps={HE_FPS}
+          controls={false}
+          loop
+          inputProps={inputProps}
+          style={{ width: playerDims.w, height: playerDims.h }}
+          acknowledgeRemotionLicense
+        />
+      </div>
+    </div>
+  );
+
+  const leftPanel = (
+    <LeftSidebar
+      presets={presets}
+      custom={custom}
+      audioFile={project.audioFile}
+      onAudioPick={(file) => updateProject({ audioFile: file })}
+      bpmEffective={bpmEffective}
+      bpmOverride={project.bpmOverride}
+      onBpmOverride={(n) => updateProject({ bpmOverride: n })}
+      settings={project.settings}
+      onSettings={updateSettings}
+      isMobile={isMobile}
+    />
+  );
+
+  const rightPanel = (
+    <RightPanel
+      frames={project.frames}
+      onReorder={reorderFrames}
+      onDelete={deleteFrame}
+      onClear={clearFrames}
+      onAdd={addFrame}
+      onIngestFiles={ingestFiles}
+      onDownload={handleDownload}
+      isRendering={isRendering}
+      progress={progress}
+      canExport={canExport}
+      exportError={exportError}
+      downloadDisabled={downloadDisabled}
+      isMobile={isMobile}
+    />
+  );
+
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateRows: "auto 1fr auto",
-        height: "100vh",
+        gridTemplateRows: isMobile ? "auto 1fr auto" : "auto 1fr auto",
+        minHeight: "100dvh",
         background: UI.chrome,
         color: UI.ink,
       }}
     >
-      <TopBar onOpen={handleOpen} onSave={handleSave} />
+      <TopBar onOpen={handleOpen} onSave={handleSave} isMobile={isMobile} />
       {savedNote ? (
         <div
           style={{
-            position: "absolute",
+            position: "fixed",
             top: 60,
             left: "50%",
             transform: "translateX(-50%)",
@@ -422,85 +524,53 @@ export const HypeEditStudio: React.FC = () => {
         </div>
       ) : null}
 
-      <main
-        style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr auto",
-          minHeight: 0,
-        }}
-      >
-        <LeftSidebar
-          presets={presets}
-          custom={custom}
-          audioFile={project.audioFile}
-          onAudioPick={(file) => updateProject({ audioFile: file })}
-          bpmEffective={bpmEffective}
-          bpmOverride={project.bpmOverride}
-          onBpmOverride={(n) => updateProject({ bpmOverride: n })}
-          settings={project.settings}
-          onSettings={updateSettings}
-        />
-
+      {isMobile ? (
         <div
-          ref={stageRef}
           style={{
-            background: UI.stageBg,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minWidth: 0,
-            overflow: "hidden",
+            flexDirection: "column",
+            minHeight: 0,
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          <div
+          {stage}
+          <Transport
+            playing={playing}
+            currentSec={currentFrame / HE_FPS}
+            durationSec={durationSec}
+            bpm={bpmEffective}
+            onPlayPause={handlePlayPause}
+            onSeek={handleSeek}
+            isMobile={isMobile}
+          />
+          {rightPanel}
+          {leftPanel}
+        </div>
+      ) : (
+        <>
+          <main
             style={{
-              width: playerDims.w,
-              height: playerDims.h,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-              borderRadius: 4,
-              overflow: "hidden",
-              background: "#000",
+              display: "grid",
+              gridTemplateColumns: "auto 1fr auto",
+              minHeight: 0,
             }}
           >
-            <Player
-              ref={playerRef}
-              component={HypeEditComposition}
-              compositionWidth={HE_WIDTH}
-              compositionHeight={HE_HEIGHT}
-              durationInFrames={durationFrames}
-              fps={HE_FPS}
-              controls={false}
-              loop
-              inputProps={inputProps}
-              style={{ width: playerDims.w, height: playerDims.h }}
-              acknowledgeRemotionLicense
-            />
-          </div>
-        </div>
-
-        <RightPanel
-          frames={project.frames}
-          onReorder={reorderFrames}
-          onDelete={deleteFrame}
-          onAdd={addFrame}
-          onIngestFiles={ingestFiles}
-          onDownload={handleDownload}
-          isRendering={isRendering}
-          progress={progress}
-          canExport={canExport}
-          exportError={exportError}
-          downloadDisabled={downloadDisabled}
-        />
-      </main>
-
-      <Transport
-        playing={playing}
-        currentSec={currentFrame / HE_FPS}
-        durationSec={durationSec}
-        bpm={bpmEffective}
-        onPlayPause={handlePlayPause}
-        onSeek={handleSeek}
-      />
+            {leftPanel}
+            {stage}
+            {rightPanel}
+          </main>
+          <Transport
+            playing={playing}
+            currentSec={currentFrame / HE_FPS}
+            durationSec={durationSec}
+            bpm={bpmEffective}
+            onPlayPause={handlePlayPause}
+            onSeek={handleSeek}
+            isMobile={isMobile}
+          />
+        </>
+      )}
 
       {isDragging ? (
         <div

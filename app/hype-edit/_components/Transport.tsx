@@ -10,6 +10,7 @@ type Props = {
   bpm: number;
   onPlayPause: () => void;
   onSeek: (sec: number) => void;
+  isMobile?: boolean;
 };
 
 export const Transport: React.FC<Props> = ({
@@ -19,6 +20,7 @@ export const Transport: React.FC<Props> = ({
   bpm,
   onPlayPause,
   onSeek,
+  isMobile,
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
   const [barW, setBarW] = useState(0);
@@ -56,12 +58,13 @@ export const Transport: React.FC<Props> = ({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 14,
-        padding: "12px 18px",
+        gap: isMobile ? 8 : 14,
+        padding: isMobile ? "10px 12px" : "12px 18px",
         borderTop: `1px solid ${UI.border}`,
+        borderBottom: isMobile ? `1px solid ${UI.border}` : "none",
         background: UI.chrome,
         fontFamily: uiFont,
-        minHeight: 62,
+        minHeight: isMobile ? 54 : 62,
       }}
     >
       <button
@@ -109,11 +112,20 @@ export const Transport: React.FC<Props> = ({
           window.addEventListener("mousemove", move);
           window.addEventListener("mouseup", up);
         }}
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          if (t) seekFromEvent(t.clientX);
+        }}
+        onTouchMove={(e) => {
+          const t = e.touches[0];
+          if (t) seekFromEvent(t.clientX);
+        }}
         style={{
           flex: 1,
           height: 36,
           position: "relative",
           cursor: "pointer",
+          touchAction: "none",
         }}
       >
         {/* Beat ticks */}
@@ -197,18 +209,20 @@ export const Transport: React.FC<Props> = ({
         {fmt(durationSec)}
       </div>
 
-      <div
-        style={{
-          fontSize: 11,
-          color: UI.muted,
-          fontFamily: uiFont,
-          minWidth: 56,
-          textAlign: "right",
-        }}
-        title="BPM drives tick density and cut cadence"
-      >
-        {bpm ? `${bpm} BPM` : "— BPM"}
-      </div>
+      {isMobile ? null : (
+        <div
+          style={{
+            fontSize: 11,
+            color: UI.muted,
+            fontFamily: uiFont,
+            minWidth: 56,
+            textAlign: "right",
+          }}
+          title="BPM drives tick density and cut cadence"
+        >
+          {bpm ? `${bpm} BPM` : "— BPM"}
+        </div>
+      )}
     </footer>
   );
 };

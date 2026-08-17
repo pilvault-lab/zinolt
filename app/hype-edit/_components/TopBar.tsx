@@ -8,34 +8,51 @@ export const TopBar: React.FC<{
   onSave: () => void;
   onDashboard?: () => void;
   onSignOut?: () => void;
-}> = ({ onOpen, onSave, onDashboard, onSignOut }) => (
+  isMobile?: boolean;
+}> = ({ onOpen, onSave, onDashboard, onSignOut, isMobile }) => (
   <header
     style={{
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "10px 16px",
+      gap: 8,
+      padding: isMobile ? "8px 10px" : "10px 16px",
       borderBottom: `1px solid ${UI.border}`,
       background: UI.chrome,
       fontFamily: uiFont,
       minHeight: 52,
     }}
   >
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: isMobile ? 8 : 12,
+        minWidth: 0,
+      }}
+    >
       <BrandMark />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: isMobile ? 6 : 8 }}>
         <OutlinePill onClick={onOpen} icon={<FolderIcon />}>
-          Open
+          {isMobile ? "" : "Open"}
         </OutlinePill>
         <OutlinePill onClick={onSave} icon={<DiskIcon />}>
-          Save
+          {isMobile ? "" : "Save"}
         </OutlinePill>
       </div>
     </div>
 
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <OutlinePill onClick={onDashboard}>Dashboard</OutlinePill>
-      <DarkPill onClick={onSignOut}>Sign out</DarkPill>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: isMobile ? 6 : 10,
+      }}
+    >
+      {isMobile ? null : (
+        <OutlinePill onClick={onDashboard}>Dashboard</OutlinePill>
+      )}
+      <DarkPill onClick={onSignOut}>{isMobile ? "Out" : "Sign out"}</DarkPill>
     </div>
   </header>
 );

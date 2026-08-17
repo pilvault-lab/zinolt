@@ -9,6 +9,7 @@ type Props = {
   frames: HypeFrame[];
   onReorder: (n: HypeFrame[]) => void;
   onDelete: (id: string) => void;
+  onClear: () => void;
   onAdd: (f: HypeFrame) => void;
   onIngestFiles: (files: FileList | File[]) => void;
   onDownload: () => void;
@@ -17,12 +18,14 @@ type Props = {
   canExport: boolean | null;
   exportError: string;
   downloadDisabled: boolean;
+  isMobile?: boolean;
 };
 
 export const RightPanel: React.FC<Props> = ({
   frames,
   onReorder,
   onDelete,
+  onClear,
   onAdd,
   onIngestFiles,
   onDownload,
@@ -31,16 +34,18 @@ export const RightPanel: React.FC<Props> = ({
   canExport,
   exportError,
   downloadDisabled,
+  isMobile,
 }) => {
   const [open, setOpen] = useState(true);
 
   return (
     <aside
       style={{
-        width: 320,
+        width: isMobile ? "100%" : 320,
         background: UI.chromePanel,
-        borderLeft: `1px solid ${UI.border}`,
-        overflowY: "auto",
+        borderLeft: isMobile ? "none" : `1px solid ${UI.border}`,
+        borderTop: isMobile ? `1px solid ${UI.border}` : "none",
+        overflowY: isMobile ? "visible" : "auto",
         fontFamily: uiFont,
         display: "flex",
         flexDirection: "column",
@@ -126,7 +131,38 @@ export const RightPanel: React.FC<Props> = ({
               ({frames.length})
             </span>
           </button>
-          <AddFrameMenu onAdd={onAdd} onIngestFiles={onIngestFiles} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {frames.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Remove all ${frames.length} frame${
+                        frames.length === 1 ? "" : "s"
+                      }? This can't be undone.`,
+                    )
+                  ) {
+                    onClear();
+                  }
+                }}
+                title="Clear all frames"
+                style={{
+                  padding: "6px 10px",
+                  background: "transparent",
+                  color: UI.inkSoft,
+                  border: `1px solid ${UI.border}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+            <AddFrameMenu onAdd={onAdd} onIngestFiles={onIngestFiles} />
+          </div>
         </div>
 
         {open ? (

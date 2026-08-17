@@ -1,6 +1,25 @@
 "use client";
 
-import React, { useState, type CSSProperties, type ReactNode } from "react";
+import React, {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+
+/** Simple SSR-safe media-query hook. */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.matchMedia(query);
+    setMatches(m.matches);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    m.addEventListener("change", handler);
+    return () => m.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
 
 /** Shared colours + type — clean off-white chrome, dark accents. */
 export const UI = {

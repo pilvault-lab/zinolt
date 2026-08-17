@@ -15,6 +15,7 @@ type Props = {
   onBpmOverride: (n: number | undefined) => void;
   settings: HypeSettings;
   onSettings: (patch: Partial<HypeSettings>) => void;
+  isMobile?: boolean;
 };
 
 export const LeftSidebar: React.FC<Props> = ({
@@ -27,13 +28,15 @@ export const LeftSidebar: React.FC<Props> = ({
   onBpmOverride,
   settings,
   onSettings,
+  isMobile,
 }) => (
   <aside
     style={{
-      width: 300,
+      width: isMobile ? "100%" : 300,
       background: UI.chromePanel,
-      borderRight: `1px solid ${UI.border}`,
-      overflowY: "auto",
+      borderRight: isMobile ? "none" : `1px solid ${UI.border}`,
+      borderTop: isMobile ? `1px solid ${UI.border}` : "none",
+      overflowY: isMobile ? "visible" : "auto",
       fontFamily: uiFont,
       display: "flex",
       flexDirection: "column",
