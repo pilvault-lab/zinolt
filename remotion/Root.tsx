@@ -50,6 +50,13 @@ import {
   CR_DEFAULT_DURATION_FRAMES,
   type ConceptReelProps,
 } from "./concept-reel/ConceptReelComposition";
+import {
+  HypeEditComposition,
+  hypeEditDefaultProps,
+  HE_FPS,
+  HE_HEIGHT,
+  HE_WIDTH,
+} from "./hype-edit/HypeEdit";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -105,7 +112,8 @@ export const RemotionRoot: React.FC = () => (
         t.id !== "daily-movers" &&
         t.id !== "story-card" &&
         t.id !== "ranking" &&
-        t.id !== "concept-reel",
+        t.id !== "concept-reel" &&
+        t.id !== "hype-edit",
     ).map((t) => (
       <Composition
         key={t.compositionId}
@@ -136,6 +144,15 @@ export const RemotionRoot: React.FC = () => (
           height: CR_HEIGHT,
         };
       }}
+    />
+    <Composition
+      id="HypeEdit"
+      component={HypeEditComposition}
+      durationInFrames={HE_FPS * 8}
+      fps={HE_FPS}
+      width={HE_WIDTH}
+      height={HE_HEIGHT}
+      defaultProps={hypeEditDefaultProps}
     />
     <Composition
       id="StoryCard"

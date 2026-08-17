@@ -154,6 +154,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/concept-reel/preview.svg",
     href: "/concept-reel",
   },
+  {
+    id: "hype-edit",
+    compositionId: "HypeEdit",
+    label: "Hype Edit",
+    background: "",
+    preview: "/hype-edit/preview.svg",
+    href: "/hype-edit",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
