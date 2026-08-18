@@ -49,10 +49,28 @@ export const LeftSidebar: React.FC<Props> = ({
       </div>
     </Panel>
 
-    <Panel title="Logo layout">
-      <div style={{ fontSize: 12, color: UI.inkSoft, lineHeight: 1.5 }}>
-        Layout is fixed: full-bleed 9:16 canvas, watermark bottom-right.
-      </div>
+    <Panel title="Frame layout">
+      <Field
+        label="Stage mode"
+        hint={
+          settings.stageMode === "letterboxed"
+            ? "16:9 stage centered, black bars top/bottom."
+            : "Full-bleed 9:16 crop — fills the canvas."
+        }
+      >
+        <select
+          value={settings.stageMode}
+          onChange={(e) =>
+            onSettings({
+              stageMode: e.target.value as HypeSettings["stageMode"],
+            })
+          }
+          style={selectStyle}
+        >
+          <option value="full-bleed">Full-bleed 9:16 (default)</option>
+          <option value="letterboxed">Letterboxed 16:9</option>
+        </select>
+      </Field>
     </Panel>
 
     <Panel title="Brand colours">

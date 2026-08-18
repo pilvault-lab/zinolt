@@ -38,6 +38,8 @@ export type HypeSettings = {
   watermark: boolean;
   /** Override auto-transitions with a single set: undefined = auto (BPM-based). */
   transitionMode: "auto" | "hard" | "smooth";
+  /** Frame stage: full-bleed 9:16 crop, or 16:9 letterboxed centered vertically. */
+  stageMode: "full-bleed" | "letterboxed";
 };
 
 export const DEFAULT_SETTINGS: HypeSettings = {
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: HypeSettings = {
   introFlash: true,
   watermark: true,
   transitionMode: "auto",
+  stageMode: "full-bleed",
 };
 
 export type HypeProject = {

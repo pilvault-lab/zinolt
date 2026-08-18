@@ -85,9 +85,9 @@ export const HypeEditComposition: React.FC<HypeEditProps> = ({
     <AbsoluteFill style={{ backgroundColor: "#000000" }}>
       {resolvedAudio ? <MediaAudio src={resolvedAudio} /> : null}
 
-      {/* Full-bleed 9:16 stage — no letterbox. Key by frame id (not cut
-       *  index) so a repeating video isn't remounted every beat, which
-       *  churns the decoder and hitches the track audio. */}
+      {/* Stage: full-bleed 9:16 crop OR 16:9 letterboxed centered vertically.
+       *  Key by frame id (not cut index) so a repeating video isn't remounted
+       *  every beat, which churns the decoder and hitches the track audio. */}
       {activeFrame ? (
         <FrameLayer
           key={activeFrame.id}
@@ -97,6 +97,7 @@ export const HypeEditComposition: React.FC<HypeEditProps> = ({
           beatSec={beatSec}
           bpm={bpm}
           forRender={forRender}
+          stageMode={settings.stageMode}
         />
       ) : (
         <EmptyStage />
@@ -120,10 +121,16 @@ const FrameLayer: React.FC<{
   beatSec: number;
   bpm: number;
   forRender: boolean;
-}> = ({ frame, transition, elapsedSec, bpm, forRender }) => {
+  stageMode: HypeSettings["stageMode"];
+}> = ({ frame, transition, elapsedSec, bpm, forRender, stageMode }) => {
   const enter = computeItemEnter(transition, elapsedSec, bpm);
   // Static hold — no ken-burns push. Only the enter transform applies.
   const combined = enter.transform;
+
+  const isLetterboxed = stageMode === "letterboxed";
+  // 16:9 stage inside 1080×1920: 1080 wide, 1080*9/16 = 607.5 tall, centered.
+  const stageHeight = Math.round((HE_WIDTH * 9) / 16);
+  const stageTop = Math.round((HE_HEIGHT - stageHeight) / 2);
 
   const mediaStyle: React.CSSProperties = {
     width: "100%",
@@ -132,9 +139,20 @@ const FrameLayer: React.FC<{
     display: "block",
   };
 
-  return (
-    <div
-      style={{
+  const wrapperStyle: React.CSSProperties = isLetterboxed
+    ? {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: stageTop,
+        height: stageHeight,
+        overflow: "hidden",
+        transform: combined,
+        filter: enter.filter,
+        opacity: enter.opacity,
+        willChange: "transform, opacity, filter",
+      }
+    : {
         position: "absolute",
         inset: 0,
         overflow: "hidden",
@@ -142,8 +160,10 @@ const FrameLayer: React.FC<{
         filter: enter.filter,
         opacity: enter.opacity,
         willChange: "transform, opacity, filter",
-      }}
-    >
+      };
+
+  return (
+    <div style={wrapperStyle}>
       {frame.kind === "solid" ? (
         <div
           style={{
