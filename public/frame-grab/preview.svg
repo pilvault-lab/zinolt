@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 480" fill="none">
+  <rect width="270" height="480" fill="#0a0a0a"/>
+  <text x="135" y="52" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="600" font-size="12" fill="rgba(255,255,255,0.6)" letter-spacing="3">FRAME GRAB</text>
+  <text x="135" y="74" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="9" fill="rgba(255,255,255,0.35)" letter-spacing="1">30 × 0.5s · 9:16</text>
+
+  <g>
+    <rect x="24" y="98" width="66" height="118" rx="4" fill="#141414" stroke="rgba(255,255,255,0.08)"/>
+    <rect x="90" y="98" width="66" height="118" rx="4" fill="#181818" stroke="rgba(255,255,255,0.08)"/>
+    <rect x="156" y="98" width="66" height="118" rx="4" fill="#141414" stroke="rgba(255,255,255,0.08)"/>
+
+    <rect x="24" y="222" width="66" height="118" rx="4" fill="#181818" stroke="rgba(255,255,255,0.08)"/>
+    <rect x="90" y="222" width="66" height="118" rx="4" fill="#141414" stroke="rgba(255,120,80,0.6)"/>
+    <rect x="156" y="222" width="66" height="118" rx="4" fill="#181818" stroke="rgba(255,255,255,0.08)"/>
+
+    <rect x="24" y="346" width="66" height="118" rx="4" fill="#141414" stroke="rgba(255,255,255,0.08)"/>
+    <rect x="90" y="346" width="66" height="118" rx="4" fill="#181818" stroke="rgba(255,255,255,0.08)"/>
+    <rect x="156" y="346" width="66" height="118" rx="4" fill="#141414" stroke="rgba(255,255,255,0.08)"/>
+  </g>
+
+  <g font-family="Helvetica, Arial, sans-serif" font-size="7" fill="rgba(255,255,255,0.45)">
+    <text x="30" y="208">01 · 0:00</text>
+    <text x="96" y="208">02 · 0:00.5</text>
+    <text x="162" y="208">03 · 0:01</text>
+    <text x="30" y="332">04 · 0:01.5</text>
+    <text x="96" y="332" fill="rgba(255,180,80,0.85)">05 · 0:02</text>
+    <text x="162" y="332">06 · 0:02.5</text>
+    <text x="30" y="456">07 · 0:03</text>
+    <text x="96" y="456">08 · 0:03.5</text>
+    <text x="162" y="456">09 · 0:04</text>
+  </g>
+</svg>

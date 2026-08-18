@@ -162,6 +162,14 @@ export const TEMPLATES: readonly Template[] = [
     preview: "/hype-edit/preview.svg",
     href: "/hype-edit",
   },
+  {
+    id: "frame-grab",
+    compositionId: "",
+    label: "Frame Grab",
+    background: "",
+    preview: "/frame-grab/preview.svg",
+    href: "/frame-grab",
+  },
 ] as const;
 
 export const DEFAULT_TEMPLATE_ID = TEMPLATES[0].id;
