@@ -6,16 +6,8 @@ import { fetchYouTube } from "@/lib/clip-studio/youtube";
 
 export type FrameMode = "full-bleed" | "letterboxed";
 
-export type WindowSpec = {
-  startSec: number;
-  count: number;
-};
-
-export type WindowResult = {
-  startSec: number;
-  count: number;
-  frames: string[];
-};
+export type WindowSpec = { startSec: number; count: number };
+export type FrameOut = { src: string; sec: number };
 
 export type FrameGrabResult = {
   sourceId: string;
@@ -24,14 +16,17 @@ export type FrameGrabResult = {
   durationSec: number;
   intervalSec: number;
   mode: FrameMode;
-  windows: WindowResult[];
+  cropOffsetX: number;
+  frames: FrameOut[];
 };
 
 type Options = {
-  source: string; // YouTube URL OR absolute local file path
-  windows: WindowSpec[];
-  intervalSec: number;
+  source: string;
   mode: FrameMode;
+  cropOffsetX?: number; // 0..1, horizontal position of the 9:16 crop. 0.5 = center.
+  intervalSec?: number; // used for windows
+  windows?: WindowSpec[]; // auto mode
+  moments?: number[]; // manual mode — one frame per timestamp (seconds)
 };
 
 function run(cmd: string, args: string[]): Promise<{ code: number | null; stderr: string }> {
@@ -54,7 +49,7 @@ function localSourceId(path: string): string {
   return `local-${name}-${hash}`;
 }
 
-type ResolvedSource = {
+export type ResolvedSource = {
   sourceId: string;
   title: string;
   channel: string;
@@ -62,7 +57,7 @@ type ResolvedSource = {
   videoPath: string;
 };
 
-async function resolveSource(source: string): Promise<ResolvedSource | { error: string }> {
+export async function resolveSource(source: string): Promise<ResolvedSource | { error: string }> {
   const s = source.trim();
   if (!s) return { error: "missing_source" };
 
@@ -78,7 +73,6 @@ async function resolveSource(source: string): Promise<ResolvedSource | { error: 
     };
   }
 
-  // Local path
   try {
     await access(s);
   } catch {
@@ -93,70 +87,107 @@ async function resolveSource(source: string): Promise<ResolvedSource | { error: 
   };
 }
 
-function buildFilter(intervalSec: number, mode: FrameMode): string {
-  const fps = 1 / intervalSec;
+/** Build the ffmpeg -vf filter for a given mode + crop offset. */
+function buildFilter(mode: FrameMode, cropOffsetX: number, fps: number): string {
+  const off = Math.max(0, Math.min(1, cropOffsetX));
   if (mode === "letterboxed") {
-    // Fit whole frame into 1080x1920, black bars top/bottom (or sides).
     return `fps=${fps},scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`;
   }
-  // Center-crop to 9:16, then scale.
-  return `fps=${fps},crop='min(iw\\,ih*9/16)':'min(ih\\,iw*16/9)',scale=1080:1920:flags=lanczos`;
+  // Full-bleed: crop 9:16 window from source, horizontal position controlled by `off`.
+  // For a 16:9 source, the crop is a vertical stripe; `(iw - crop_w) * off` positions it.
+  const cropW = `min(iw\\,ih*9/16)`;
+  const cropH = `min(ih\\,iw*16/9)`;
+  const cropX = `(iw-${cropW})*${off.toFixed(4)}`;
+  const cropY = `(ih-${cropH})/2`;
+  return `fps=${fps},crop=${cropW}:${cropH}:${cropX}:${cropY},scale=1080:1920:flags=lanczos`;
 }
 
 export async function extractFrames(opts: Options): Promise<FrameGrabResult | { error: string }> {
-  const { source, intervalSec, mode, windows } = opts;
-  if (intervalSec <= 0) return { error: "invalid_interval" };
-  if (!Array.isArray(windows) || windows.length === 0) return { error: "no_windows" };
-  const totalCount = windows.reduce((a, w) => a + w.count, 0);
-  if (totalCount <= 0 || totalCount > 600) return { error: "invalid_count" };
-  for (const w of windows) {
-    if (!(w.count > 0) || !(w.startSec >= 0)) return { error: "invalid_window" };
+  const { source, mode } = opts;
+  const cropOffsetX = typeof opts.cropOffsetX === "number" ? opts.cropOffsetX : 0.5;
+  const intervalSec = opts.intervalSec ?? 0.5;
+
+  const isManual = Array.isArray(opts.moments) && opts.moments.length > 0;
+  const isAuto = Array.isArray(opts.windows) && opts.windows.length > 0;
+  if (!isManual && !isAuto) return { error: "no_moments_or_windows" };
+
+  if (isAuto) {
+    if (intervalSec <= 0) return { error: "invalid_interval" };
+    for (const w of opts.windows!) {
+      if (!(w.count > 0) || !(w.startSec >= 0)) return { error: "invalid_window" };
+    }
+  }
+  if (isManual) {
+    for (const m of opts.moments!) {
+      if (!(m >= 0) || !isFinite(m)) return { error: "invalid_moment" };
+    }
+    if (opts.moments!.length > 600) return { error: "too_many_moments" };
   }
 
   const resolved = await resolveSource(source);
   if ("error" in resolved) return resolved;
 
   const outDir = join(process.cwd(), "public", "frame-grab", resolved.sourceId);
-  // Wipe previous run for this source (filenames repeat).
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  const filter = buildFilter(intervalSec, mode);
-  const windowResults: WindowResult[] = [];
+  const frames: FrameOut[] = [];
 
-  for (let i = 0; i < windows.length; i++) {
-    const w = windows[i];
-    const duration = intervalSec * w.count + 0.5;
-    const prefix = `w${String(i + 1).padStart(2, "0")}`;
-
-    const args = [
-      "-y",
-      "-ss", String(w.startSec),
-      "-i", resolved.videoPath,
-      "-t", String(duration),
-      "-vf", filter,
-      "-frames:v", String(w.count),
-      "-q:v", "2",
-      join(outDir, `${prefix}_frame_%02d.jpg`),
-    ];
-
-    const res = await run("ffmpeg", args);
-    if (res.code !== 0) {
-      return { error: `ffmpeg failed (window ${i + 1}): ${res.stderr.slice(-400)}` };
+  if (isManual) {
+    const filter = buildFilter(mode, cropOffsetX, 30); // fps irrelevant for -frames:v 1 with -ss
+    const moments = opts.moments!;
+    for (let i = 0; i < moments.length; i++) {
+      const t = moments[i];
+      const name = `m${String(i + 1).padStart(3, "0")}_${Math.round(t * 1000)}.jpg`;
+      const args = [
+        "-y",
+        "-ss", String(t),
+        "-i", resolved.videoPath,
+        "-vf", filter,
+        "-frames:v", "1",
+        "-q:v", "2",
+        join(outDir, name),
+      ];
+      const res = await run("ffmpeg", args);
+      if (res.code !== 0) {
+        return { error: `ffmpeg failed (moment ${i + 1} at ${t}s): ${res.stderr.slice(-400)}` };
+      }
+      frames.push({ src: `/frame-grab/${resolved.sourceId}/${name}`, sec: t });
     }
-
-    const files = (await readdir(outDir))
-      .filter((f) => f.startsWith(`${prefix}_frame_`) && f.endsWith(".jpg"))
-      .sort();
-    if (files.length === 0) {
-      return { error: `no_frames_extracted (window ${i + 1})` };
+  } else {
+    // Auto: one ffmpeg per window, collect files in disk order.
+    for (let wi = 0; wi < opts.windows!.length; wi++) {
+      const w = opts.windows![wi];
+      const duration = intervalSec * w.count + 0.5;
+      const prefix = `w${String(wi + 1).padStart(2, "0")}`;
+      const filter = buildFilter(mode, cropOffsetX, 1 / intervalSec);
+      const args = [
+        "-y",
+        "-ss", String(w.startSec),
+        "-i", resolved.videoPath,
+        "-t", String(duration),
+        "-vf", filter,
+        "-frames:v", String(w.count),
+        "-q:v", "2",
+        join(outDir, `${prefix}_frame_%02d.jpg`),
+      ];
+      const res = await run("ffmpeg", args);
+      if (res.code !== 0) {
+        return { error: `ffmpeg failed (window ${wi + 1}): ${res.stderr.slice(-400)}` };
+      }
+      const files = (await readdir(outDir))
+        .filter((f) => f.startsWith(`${prefix}_frame_`) && f.endsWith(".jpg"))
+        .sort();
+      files.forEach((f, i) => {
+        frames.push({
+          src: `/frame-grab/${resolved.sourceId}/${f}`,
+          sec: w.startSec + i * intervalSec,
+        });
+      });
     }
-    windowResults.push({
-      startSec: w.startSec,
-      count: files.length,
-      frames: files.map((f) => `/frame-grab/${resolved.sourceId}/${f}`),
-    });
   }
+
+  if (frames.length === 0) return { error: "no_frames_extracted" };
 
   return {
     sourceId: resolved.sourceId,
@@ -165,6 +196,7 @@ export async function extractFrames(opts: Options): Promise<FrameGrabResult | { 
     durationSec: resolved.durationSec,
     intervalSec,
     mode,
-    windows: windowResults,
+    cropOffsetX,
+    frames,
   };
 }
