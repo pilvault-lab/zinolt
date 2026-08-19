@@ -7,9 +7,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 type Body = {
-  /** Source video Blob URL (from client-upload via /api/frame-grab/upload-token). */
+  /** Blob pathname for the source video (preferred, private-store friendly). */
+  sourcePathname?: string;
+  /** Legacy: Blob URL. We parse the pathname out of it. */
   sourceUrl?: string;
-  /** Legacy field, still accepted — must also be a Blob URL now. */
+  /** Legacy alias, still accepted. */
   source?: string;
   mode?: string;
   cropOffsetX?: number;
@@ -19,7 +21,6 @@ type Body = {
   moments?: number[];
 };
 
-/** Expand auto-mode windows into a flat list of clip start timestamps. */
 function expandWindows(
   windows: Array<{ startSec?: number; count?: number }>,
   intervalSec: number,
@@ -33,6 +34,18 @@ function expandWindows(
   return out;
 }
 
+/** Best-effort extract a Blob pathname from a URL. Blob URLs look like
+ *  https://<store>.public.blob.vercel-storage.com/<pathname>. */
+function pathnameFromBlobUrl(u: string): string | null {
+  try {
+    const url = new URL(u);
+    if (!url.hostname.endsWith(".blob.vercel-storage.com")) return null;
+    return url.pathname.replace(/^\//, "");
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   let body: Body;
   try {
@@ -41,13 +54,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const sourceUrl = (body.sourceUrl ?? body.source ?? "").trim();
-  if (!sourceUrl) return NextResponse.json({ error: "missing_source" }, { status: 400 });
-  // Only accept Blob URLs. YouTube/plain URLs would need a separate download
-  // path (yt-dlp in the sandbox, or a two-hop through the parent function).
-  if (!/^https?:\/\/[^/]*\.public\.blob\.vercel-storage\.com\//i.test(sourceUrl)) {
+  let sourcePathname = (body.sourcePathname ?? "").trim();
+  if (!sourcePathname) {
+    const rawSource = (body.sourceUrl ?? body.source ?? "").trim();
+    if (rawSource) {
+      const derived = pathnameFromBlobUrl(rawSource);
+      if (derived) sourcePathname = derived;
+    }
+  }
+  if (!sourcePathname) {
     return NextResponse.json(
-      { error: "source_must_be_blob_url", message: "Upload the file first — YouTube/URL sources aren't wired to the sandbox flow yet." },
+      {
+        error: "missing_source",
+        message:
+          "Send { sourcePathname } from a Blob upload or a resolve response. Raw URLs / local paths aren't supported on the sandbox flow.",
+      },
+      { status: 400 },
+    );
+  }
+  if (!sourcePathname.startsWith("frame-grab/")) {
+    return NextResponse.json(
+      { error: "bad_source_pathname" },
       { status: 400 },
     );
   }
@@ -79,7 +106,7 @@ export async function POST(req: Request) {
   const jobId = randomBytes(6).toString("hex");
   const result = await runFrameGrabSandbox({
     jobId,
-    sourceUrl,
+    sourcePathname,
     mode,
     cropOffsetX,
     clipDurationSec,
@@ -90,7 +117,6 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 502 });
   }
 
-  // Match the existing FrameGrabResponse shape the client already expects.
   return NextResponse.json({
     sourceId: jobId,
     title: "Uploaded video",
@@ -101,7 +127,7 @@ export async function POST(req: Request) {
     mode,
     cropOffsetX,
     clips: result.clips.map((c) => ({
-      src: c.url,
+      src: `/api/frame-grab/clip?p=${encodeURIComponent(c.pathname)}`,
       sec: c.sec,
       durationSec: c.durationSec,
       sizeBytes: c.sizeBytes,

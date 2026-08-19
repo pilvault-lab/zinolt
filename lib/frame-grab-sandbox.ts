@@ -16,6 +16,10 @@ import { Sandbox } from "@vercel/sandbox";
  */
 
 const FFMPEG_INSTALL_CMD = "sudo dnf install -y ffmpeg-free 2>&1";
+// yt-dlp_linux is a self-contained binary (bundled Python). ffmpeg is still
+// required for the merge step of separate video+audio streams.
+const YTDLP_INSTALL_CMD =
+  "sudo curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp && sudo chmod a+rx /usr/local/bin/yt-dlp 2>&1";
 const SANDBOX_WORK_DIR = "/work";
 // 8 min max — Hobby function cap is 300s but the sandbox runs beyond the
 // parent function's window if the caller detaches. Here we're synchronous
@@ -23,12 +27,20 @@ const SANDBOX_WORK_DIR = "/work";
 const SANDBOX_TIMEOUT_MS = 8 * 60_000;
 
 let cachedPipelineScript: string | null = null;
+let cachedYoutubeScript: string | null = null;
 
 async function readPipelineScript(): Promise<string> {
   if (cachedPipelineScript) return cachedPipelineScript;
   const scriptPath = path.join(process.cwd(), "scripts", "frame-grab-pipeline.mjs");
   cachedPipelineScript = await fs.readFile(scriptPath, "utf8");
   return cachedPipelineScript;
+}
+
+async function readYoutubeScript(): Promise<string> {
+  if (cachedYoutubeScript) return cachedYoutubeScript;
+  const scriptPath = path.join(process.cwd(), "scripts", "frame-grab-youtube-pipeline.mjs");
+  cachedYoutubeScript = await fs.readFile(scriptPath, "utf8");
+  return cachedYoutubeScript;
 }
 
 function getSandboxCredentials() {
@@ -49,7 +61,7 @@ function getSandboxCredentials() {
 }
 
 export type SandboxClip = {
-  url: string;
+  pathname: string;
   sec: number;
   durationSec: number;
   sizeBytes: number;
@@ -61,7 +73,7 @@ export type SandboxResult =
 
 export async function runFrameGrabSandbox(args: {
   jobId: string;
-  sourceUrl: string;
+  sourcePathname: string;
   mode: "full-bleed" | "letterboxed";
   cropOffsetX: number;
   clipDurationSec: number;
@@ -130,7 +142,7 @@ export async function runFrameGrabSandbox(args: {
       env: {
         BLOB_READ_WRITE_TOKEN: blobToken,
         JOB_ID: args.jobId,
-        SOURCE_URL: args.sourceUrl,
+        SOURCE_PATHNAME: args.sourcePathname,
         MODE: args.mode,
         CROP_OFFSET_X: String(args.cropOffsetX),
         CLIP_DURATION_SEC: String(args.clipDurationSec),
@@ -167,3 +179,126 @@ export async function runFrameGrabSandbox(args: {
     await sandbox.stop().catch(() => {});
   }
 }
+
+// ---------- YouTube fetch ------------------------------------------------
+
+export type YoutubeFetchResult =
+  | {
+      pathname: string;
+      videoId: string | null;
+      title: string;
+      channel: string;
+      durationSec: number;
+      sizeBytes: number;
+    }
+  | { error: string; stderr?: string };
+
+/**
+ * Downloads a YouTube video inside a sandbox and uploads it to private Blob.
+ * Returns the Blob pathname (not URL) so the caller can hand it to the
+ * extract flow or serve it via a proxy route.
+ */
+export async function runYoutubeFetchSandbox(args: {
+  jobId: string;
+  youtubeUrl: string;
+  maxHeight?: number;
+}): Promise<YoutubeFetchResult> {
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!blobToken) {
+    return {
+      error:
+        "BLOB_READ_WRITE_TOKEN missing — enable Vercel Blob on this project and pull env vars.",
+    };
+  }
+
+  const snapshotId = process.env.FRAME_GRAB_SANDBOX_SNAPSHOT_ID;
+  const credentials = getSandboxCredentials();
+  const pipelineScript = await readYoutubeScript();
+
+  const sandbox = snapshotId
+    ? await Sandbox.create({
+        ...credentials,
+        source: { type: "snapshot", snapshotId },
+        timeout: SANDBOX_TIMEOUT_MS,
+      })
+    : await Sandbox.create({
+        ...credentials,
+        runtime: "node24",
+        timeout: SANDBOX_TIMEOUT_MS,
+      });
+
+  try {
+    if (!snapshotId) {
+      // ffmpeg for the merge step. yt-dlp will bail without it on separate
+      // video+audio streams.
+      const installFfmpeg = await sandbox.runCommand("sh", ["-c", FFMPEG_INSTALL_CMD]);
+      if (installFfmpeg.exitCode !== 0) {
+        return {
+          error: `ffmpeg_install_failed (exit ${installFfmpeg.exitCode})`,
+          stderr: await installFfmpeg.stderr(),
+        };
+      }
+      const installYtdlp = await sandbox.runCommand("sh", ["-c", YTDLP_INSTALL_CMD]);
+      if (installYtdlp.exitCode !== 0) {
+        return {
+          error: `ytdlp_install_failed (exit ${installYtdlp.exitCode})`,
+          stderr: await installYtdlp.stderr(),
+        };
+      }
+      await sandbox.runCommand("mkdir", ["-p", SANDBOX_WORK_DIR]);
+      const npmInstall = await sandbox.runCommand("sh", [
+        "-c",
+        `cd ${SANDBOX_WORK_DIR} && npm init -y >/dev/null && npm install @vercel/blob --no-audit --no-fund 2>&1`,
+      ]);
+      if (npmInstall.exitCode !== 0) {
+        return {
+          error: `npm_install_failed (exit ${npmInstall.exitCode})`,
+          stderr: await npmInstall.stderr(),
+        };
+      }
+    }
+
+    await sandbox.writeFiles([
+      {
+        path: `${SANDBOX_WORK_DIR}/youtube.mjs`,
+        content: pipelineScript,
+      },
+    ]);
+
+    const run = await sandbox.runCommand({
+      cmd: "node",
+      args: [`${SANDBOX_WORK_DIR}/youtube.mjs`],
+      cwd: SANDBOX_WORK_DIR,
+      env: {
+        BLOB_READ_WRITE_TOKEN: blobToken,
+        JOB_ID: args.jobId,
+        YOUTUBE_URL: args.youtubeUrl,
+        MAX_HEIGHT: String(args.maxHeight ?? 1080),
+      },
+    });
+
+    const stdout = await run.stdout();
+    const stderr = await run.stderr();
+    const lastLine = stdout.trim().split(/\r?\n/).filter(Boolean).pop() ?? "";
+    let parsed: YoutubeFetchResult | null = null;
+    try {
+      parsed = JSON.parse(lastLine) as YoutubeFetchResult;
+    } catch {
+      /* fall through */
+    }
+    if (run.exitCode !== 0) {
+      const msg =
+        parsed && "error" in parsed
+          ? parsed.error
+          : `youtube_pipeline_failed (exit ${run.exitCode})`;
+      return { error: msg, stderr: stderr.slice(-800) };
+    }
+    if (!parsed || !("pathname" in parsed)) {
+      return { error: "youtube_pipeline_no_json", stderr: stderr.slice(-800) };
+    }
+    return parsed;
+  } finally {
+    await sandbox.stop().catch(() => {});
+  }
+}
+

@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/reel-safe": ["./scripts/reel-safe-pipeline.mjs"],
     "/api/frame-grab": ["./scripts/frame-grab-pipeline.mjs"],
+    "/api/frame-grab/resolve": ["./scripts/frame-grab-youtube-pipeline.mjs"],
   },
   async headers() {
     return [

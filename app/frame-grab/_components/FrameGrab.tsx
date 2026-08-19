@@ -36,6 +36,12 @@ type ResolveResponse = {
   channel: string;
   durationSec: number;
   streamUrl: string;
+  /**
+   * Blob pathname the extract API should use. Set for YouTube (sandbox
+   * downloaded → uploaded to private Blob) and for uploaded local files.
+   * Absent for legacy local-dev file paths.
+   */
+  sourcePathname?: string;
 };
 
 type Marker = { id: string; sec: number; thumb?: string };
@@ -45,7 +51,7 @@ type PickMode = "auto" | "manual" | "paste" | "random";
 type UploadState =
   | { phase: "idle" }
   | { phase: "uploading"; name: string; loaded: number; total: number }
-  | { phase: "done"; name: string; blobUrl: string }
+  | { phase: "done"; name: string; blobUrl: string; pathname: string }
   | { phase: "error"; message: string };
 
 const fmtTime = (s: number) => {
@@ -233,7 +239,7 @@ export function FrameGrab() {
     const pathname = `frame-grab/uploads/${Date.now()}-${safeName}`;
 
     void blobUpload(pathname, file, {
-      access: "public",
+      access: "private",
       handleUploadUrl: "/api/frame-grab/upload-token",
       contentType: file.type || "video/mp4",
       onUploadProgress: (p) => {
@@ -246,7 +252,7 @@ export function FrameGrab() {
       },
     })
       .then((blob) => {
-        setUpload({ phase: "done", name: file.name, blobUrl: blob.url });
+        setUpload({ phase: "done", name: file.name, blobUrl: blob.url, pathname: blob.pathname });
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "upload_network_error";
@@ -363,10 +369,15 @@ export function FrameGrab() {
       setError(`Upload failed: ${upload.message}. Re-pick the file.`);
       return;
     }
-    const extractionSource =
-      pickedBlobUrl && upload.phase === "done" ? upload.blobUrl : source.trim();
-    if (!extractionSource) {
-      setError("No source to extract from. Pick a file or paste a URL/path.");
+    // Preferred: send a Blob pathname (upload path OR resolved YouTube).
+    // Fall back to `source` (raw string) only for the legacy local-dev case.
+    const extractionPathname =
+      pickedBlobUrl && upload.phase === "done"
+        ? upload.pathname
+        : loaded.sourcePathname ?? "";
+    const extractionSource = extractionPathname ? "" : source.trim();
+    if (!extractionPathname && !extractionSource) {
+      setError("No source to extract from. Pick a file or load a URL first.");
       return;
     }
     const moments = buildMoments();
@@ -381,12 +392,13 @@ export function FrameGrab() {
     setExtracting(true);
     try {
       const body: Record<string, unknown> = {
-        source: extractionSource,
         mode,
         cropOffsetX,
         intervalSec: interval,
         clipDurationSec,
       };
+      if (extractionPathname) body.sourcePathname = extractionPathname;
+      else body.source = extractionSource;
       if (pickMode === "auto") {
         body.windows = rows.map((r) => ({
           startSec: parseStart(r.startStr),
@@ -429,21 +441,26 @@ export function FrameGrab() {
   const nudgeClip = useCallback(
     async (clip: Clip, delta: number) => {
       if (!loaded) return;
-      const extractionSource =
-        pickedBlobUrl && upload.phase === "done" ? upload.blobUrl : source.trim();
-      if (!extractionSource) return;
+      const extractionPathname =
+        pickedBlobUrl && upload.phase === "done"
+          ? upload.pathname
+          : loaded.sourcePathname ?? "";
+      const extractionSource = extractionPathname ? "" : source.trim();
+      if (!extractionPathname && !extractionSource) return;
       const newSec = Math.max(0, clip.sec + delta);
       try {
+        const body: Record<string, unknown> = {
+          mode,
+          cropOffsetX,
+          clipDurationSec,
+          moments: [newSec],
+        };
+        if (extractionPathname) body.sourcePathname = extractionPathname;
+        else body.source = extractionSource;
         const res = await fetch("/api/frame-grab", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            source: extractionSource,
-            mode,
-            cropOffsetX,
-            clipDurationSec,
-            moments: [newSec],
-          }),
+          body: JSON.stringify(body),
         });
         const json = await res.json();
         if (!res.ok) {

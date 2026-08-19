@@ -6,7 +6,7 @@
 // Env inputs:
 //   BLOB_READ_WRITE_TOKEN  — required, passed through from the function
 //   JOB_ID                 — required, opaque hex string (namespaces Blob paths)
-//   SOURCE_URL             — required, public blob URL of the source video
+//   SOURCE_PATHNAME        — required, private blob pathname of the source video
 //   MODE                   — "full-bleed" | "letterboxed"
 //   CROP_OFFSET_X          — 0..1, horizontal crop position for full-bleed
 //   CLIP_DURATION_SEC      — float seconds per clip
@@ -20,10 +20,10 @@ import { createWriteStream, promises as fs } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
-import { put } from "@vercel/blob";
+import { get, put } from "@vercel/blob";
 
 const JOB_ID = required("JOB_ID");
-const SOURCE_URL = required("SOURCE_URL");
+const SOURCE_PATHNAME = required("SOURCE_PATHNAME");
 const MODE = process.env.MODE === "letterboxed" ? "letterboxed" : "full-bleed";
 const CROP_OFFSET_X = Math.max(0, Math.min(1, parseFloat(process.env.CROP_OFFSET_X ?? "0.5")));
 const CLIP_DURATION_SEC = Math.max(0.05, Math.min(10, parseFloat(process.env.CLIP_DURATION_SEC ?? "0.5")));
@@ -64,11 +64,13 @@ function buildFilter(mode, off) {
 }
 
 async function downloadSource() {
-  log(`downloading ${SOURCE_URL} → ${SRC_PATH}`);
-  const res = await fetch(SOURCE_URL);
-  if (!res.ok || !res.body) throw new Error(`download_failed: ${res.status}`);
+  log(`downloading blob ${SOURCE_PATHNAME} → ${SRC_PATH}`);
+  const res = await get(SOURCE_PATHNAME, { access: "private" });
+  if (!res || res.statusCode !== 200 || !res.stream) {
+    throw new Error(`download_failed: statusCode=${res?.statusCode ?? "null"}`);
+  }
   await fs.mkdir(WORK_DIR, { recursive: true });
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(SRC_PATH));
+  await pipeline(Readable.fromWeb(res.stream), createWriteStream(SRC_PATH));
   const s = await fs.stat(SRC_PATH);
   log(`downloaded ${(s.size / 1024 / 1024).toFixed(1)} MB`);
 }
@@ -96,8 +98,9 @@ async function extractClip(index, startSec) {
     throw new Error(`ffmpeg_failed clip ${index + 1} at ${startSec}s: ${res.stderr.slice(-400)}`);
   }
   const buf = await fs.readFile(outPath);
-  const blob = await put(`frame-grab/jobs/${JOB_ID}/${name}`, buf, {
-    access: "public",
+  const clipPathname = `frame-grab/jobs/${JOB_ID}/${name}`;
+  await put(clipPathname, buf, {
+    access: "private",
     contentType: "video/mp4",
     addRandomSuffix: false,
     allowOverwrite: true,
@@ -106,7 +109,7 @@ async function extractClip(index, startSec) {
   // Free /tmp — we don't need the file after upload.
   await fs.unlink(outPath).catch(() => {});
   return {
-    url: blob.url,
+    pathname: clipPathname,
     sec: startSec,
     durationSec: CLIP_DURATION_SEC,
     sizeBytes: buf.length,
