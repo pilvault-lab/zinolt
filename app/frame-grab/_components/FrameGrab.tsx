@@ -306,13 +306,20 @@ export function FrameGrab() {
       const n = Math.max(1, Math.min(500, Math.floor(randomCount) || 30));
       // Stratified pick: split the timeline into N equal bands and drop one
       // clip in a random spot inside each band. Better spread than pure random
-      // (avoids clumps + gaps), still feels random.
+      // (avoids clumps + gaps).
       const rand = mulberry32(Math.floor(randomSeed * 2 ** 32));
       const out: number[] = [];
       for (let i = 0; i < n; i++) {
         const bandStart = (i / n) * usable;
         const bandEnd = ((i + 1) / n) * usable;
         out.push(bandStart + rand() * (bandEnd - bandStart));
+      }
+      // Fisher-Yates shuffle so the extract grid isn't ordered by timestamp.
+      // Stratification kept coverage even; shuffling only touches order, so
+      // clips still cover the whole video but appear jumbled in the output.
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
       }
       return out;
     }
