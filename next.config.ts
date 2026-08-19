@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   // available on serverless — Next.js can't detect this dynamic fs.readFile.
   outputFileTracingIncludes: {
     "/api/reel-safe": ["./scripts/reel-safe-pipeline.mjs"],
+    "/api/frame-grab": ["./scripts/frame-grab-pipeline.mjs"],
   },
   async headers() {
     return [

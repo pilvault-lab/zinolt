@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import JSZip from "jszip";
+import { upload as blobUpload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Header } from "../../_components/Header";
 import { VideoStage } from "./VideoStage";
@@ -44,7 +45,7 @@ type PickMode = "auto" | "manual" | "paste" | "random";
 type UploadState =
   | { phase: "idle" }
   | { phase: "uploading"; name: string; loaded: number; total: number }
-  | { phase: "done"; name: string; serverPath: string }
+  | { phase: "done"; name: string; blobUrl: string }
   | { phase: "error"; message: string };
 
 const fmtTime = (s: number) => {
@@ -191,15 +192,18 @@ export function FrameGrab() {
     }
   }, [source, pickedBlobUrl]);
 
-  // Native picker: play instantly (blob URL) + stream-upload in background.
+  // Native picker: play instantly (blob URL) + stream-upload to Vercel Blob
+  // in the background. Client-upload flow — the file goes direct from browser
+  // to Blob storage, bypassing the 4.5 MB Vercel function body cap that used
+  // to 413 anything larger.
   const onFilePicked = useCallback((file: File) => {
     setError(null);
     setResult(null);
     setMarkers([]);
     setLoaded(null);
     if (pickedBlobUrl) URL.revokeObjectURL(pickedBlobUrl);
-    const blobUrl = URL.createObjectURL(file);
-    setPickedBlobUrl(blobUrl);
+    const objectUrl = URL.createObjectURL(file);
+    setPickedBlobUrl(objectUrl);
     setPickedMeta({ name: file.name, sizeMB: file.size / (1024 * 1024) });
     setSource("");
     setLoaded({
@@ -207,36 +211,33 @@ export function FrameGrab() {
       title: file.name,
       channel: "local",
       durationSec: 0,
-      streamUrl: blobUrl,
+      streamUrl: objectUrl,
     });
-    // Start upload immediately so the server path is ready when the user hits Extract.
     setUpload({ phase: "uploading", name: file.name, loaded: 0, total: file.size });
-    const xhr = new XMLHttpRequest();
-    const qs = new URLSearchParams({
-      name: file.name,
-      size: String(file.size),
-      lastModified: String(file.lastModified),
-    });
-    xhr.open("POST", `/api/frame-grab/upload?${qs.toString()}`);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        setUpload({ phase: "uploading", name: file.name, loaded: e.loaded, total: e.total });
-      }
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const json = JSON.parse(xhr.responseText) as { path: string };
-          setUpload({ phase: "done", name: file.name, serverPath: json.path });
-        } catch {
-          setUpload({ phase: "error", message: "bad_upload_response" });
-        }
-      } else {
-        setUpload({ phase: "error", message: `upload_failed_${xhr.status}` });
-      }
-    };
-    xhr.onerror = () => setUpload({ phase: "error", message: "upload_network_error" });
-    xhr.send(file);
+
+    const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 80);
+    const pathname = `frame-grab/uploads/${Date.now()}-${safeName}`;
+
+    void blobUpload(pathname, file, {
+      access: "public",
+      handleUploadUrl: "/api/frame-grab/upload-token",
+      contentType: file.type || "video/mp4",
+      onUploadProgress: (p) => {
+        setUpload({
+          phase: "uploading",
+          name: file.name,
+          loaded: Math.round((p.percentage / 100) * file.size),
+          total: file.size,
+        });
+      },
+    })
+      .then((blob) => {
+        setUpload({ phase: "done", name: file.name, blobUrl: blob.url });
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "upload_network_error";
+        setUpload({ phase: "error", message: msg });
+      });
   }, [pickedBlobUrl]);
 
   const grabMoment = useCallback(async () => {
@@ -349,7 +350,7 @@ export function FrameGrab() {
       return;
     }
     const extractionSource =
-      pickedBlobUrl && upload.phase === "done" ? upload.serverPath : source.trim();
+      pickedBlobUrl && upload.phase === "done" ? upload.blobUrl : source.trim();
     if (!extractionSource) {
       setError("No source to extract from. Pick a file or paste a URL/path.");
       return;
@@ -415,7 +416,7 @@ export function FrameGrab() {
     async (clip: Clip, delta: number) => {
       if (!loaded) return;
       const extractionSource =
-        pickedBlobUrl && upload.phase === "done" ? upload.serverPath : source.trim();
+        pickedBlobUrl && upload.phase === "done" ? upload.blobUrl : source.trim();
       if (!extractionSource) return;
       const newSec = Math.max(0, clip.sec + delta);
       try {
