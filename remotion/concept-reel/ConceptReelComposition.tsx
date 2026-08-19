@@ -159,7 +159,17 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: "#0A0A0A" }}>
       {audioSrc ? (
-        <MediaAudio src={audioSrc.startsWith("data:") || audioSrc.startsWith("http") ? audioSrc : staticFile(audioSrc)} />
+        <MediaAudio
+          src={
+            // Absolute (http/https), data URL, or same-origin path (/api/...):
+            // use as-is. Anything else is a bundled static asset name.
+            audioSrc.startsWith("data:") ||
+            audioSrc.startsWith("http") ||
+            audioSrc.startsWith("/")
+              ? audioSrc
+              : staticFile(audioSrc)
+          }
+        />
       ) : null}
 
       {/* Background loop — object-fit: cover, muted, plus a dark scrim so text stays legible. */}
