@@ -39,7 +39,7 @@ type ResolveResponse = {
 
 type Marker = { id: string; sec: number; thumb?: string };
 type WindowRow = { id: string; startStr: string; countStr: string };
-type PickMode = "auto" | "manual" | "paste";
+type PickMode = "auto" | "manual" | "paste" | "random";
 
 type UploadState =
   | { phase: "idle" }
@@ -87,6 +87,19 @@ function parseTimestampsBlob(raw: string): number[] {
   return out;
 }
 
+/** Deterministic 32-bit PRNG so a given randomSeed always produces the same
+ *  set of moments (client preview + server extract stay in sync). */
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const newRow = (start = "0", count = "30"): WindowRow => ({
   id: Math.random().toString(36).slice(2, 9),
   startStr: start,
@@ -107,7 +120,7 @@ export function FrameGrab() {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<ResolveResponse | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [, setDuration] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [mode, setMode] = useState<"full-bleed" | "letterboxed">("full-bleed");
   const [cropOffsetX, setCropOffsetX] = useState(0.5);
   const [pickMode, setPickMode] = useState<PickMode>("manual");
@@ -122,6 +135,12 @@ export function FrameGrab() {
 
   // Paste mode
   const [pasteText, setPasteText] = useState("");
+
+  // Random mode
+  const [randomCount, setRandomCount] = useState(30);
+  // Deterministic seed for a given "roll" — bumped by the Re-roll button so
+  // the moments preview + the extract call use the same set.
+  const [randomSeed, setRandomSeed] = useState(() => Math.random());
 
   // Extraction result
   const [extracting, setExtracting] = useState(false);
@@ -278,6 +297,25 @@ export function FrameGrab() {
       }
       return parsed;
     }
+    if (pickMode === "random") {
+      const effDur = duration || loaded?.durationSec || 0;
+      if (!effDur || effDur < clipDurationSec * 2) {
+        return { error: "Video duration unknown — let the player load first, or paste a URL that resolves." };
+      }
+      const usable = Math.max(0, effDur - clipDurationSec);
+      const n = Math.max(1, Math.min(500, Math.floor(randomCount) || 30));
+      // Stratified pick: split the timeline into N equal bands and drop one
+      // clip in a random spot inside each band. Better spread than pure random
+      // (avoids clumps + gaps), still feels random.
+      const rand = mulberry32(Math.floor(randomSeed * 2 ** 32));
+      const out: number[] = [];
+      for (let i = 0; i < n; i++) {
+        const bandStart = (i / n) * usable;
+        const bandEnd = ((i + 1) / n) * usable;
+        out.push(bandStart + rand() * (bandEnd - bandStart));
+      }
+      return out;
+    }
     // Auto: expand windows into a flat list of timestamps.
     const out: number[] = [];
     for (const r of rows) {
@@ -286,7 +324,7 @@ export function FrameGrab() {
       for (let i = 0; i < count; i++) out.push(start + i * interval);
     }
     return out;
-  }, [pickMode, markers, pasteText, rows, interval]);
+  }, [pickMode, markers, pasteText, rows, interval, duration, loaded, clipDurationSec, randomCount, randomSeed]);
 
   // Extraction runs server-side against either the uploaded copy of a local file,
   // or the URL/typed path the user pasted.
@@ -643,7 +681,7 @@ export function FrameGrab() {
         {/* Pick mode tabs — visible always so you can switch to Paste even if the player is black */}
         {(loaded || pickMode === "paste") && (
           <div className="mt-4 flex items-center gap-1 border-b border-ds-border-hairline">
-            {(["manual", "auto", "paste"] as const).map((m) => (
+            {(["manual", "auto", "random", "paste"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setPickMode(m)}
@@ -653,7 +691,13 @@ export function FrameGrab() {
                     : "text-ds-on-surface-muted hover:text-ds-on-surface"
                 }`}
               >
-                {m === "manual" ? "Manual (pick)" : m === "auto" ? "Auto (interval)" : "Paste timestamps"}
+                {m === "manual"
+                  ? "Manual (pick)"
+                  : m === "auto"
+                    ? "Auto (interval)"
+                    : m === "random"
+                      ? "Random"
+                      : "Paste timestamps"}
               </button>
             ))}
             <div className="ml-auto flex items-center gap-2 py-1">
@@ -783,6 +827,64 @@ export function FrameGrab() {
             </div>
           </div>
         )}
+
+        {loaded && pickMode === "random" && (() => {
+          const effDur = duration || loaded.durationSec || 0;
+          const canPreview = effDur > 0;
+          const preview = canPreview ? (buildMoments() as number[] | { error: string }) : null;
+          const previewList = Array.isArray(preview) ? preview : [];
+          return (
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-xs text-ds-on-surface-muted">
+                  Clip count
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    step="1"
+                    value={randomCount}
+                    onChange={(e) => setRandomCount(Math.max(1, Math.min(500, Math.floor(Number(e.target.value) || 30))))}
+                    className="w-24 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-3 py-2 text-sm outline-none focus:border-ds-primary"
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRandomSeed(Math.random())}
+                  disabled={!canPreview}
+                >
+                  Re-roll
+                </Button>
+                <div className="text-[11px] text-ds-on-surface-muted">
+                  {canPreview
+                    ? `${previewList.length} random moments from a ${fmtTime(effDur)} video. Stratified — one per equal band, jittered.`
+                    : "Load a video first — random pick needs a known duration."}
+                </div>
+              </div>
+              {canPreview && previewList.length > 0 && (
+                <div className="rounded-md border border-ds-border-hairline bg-ds-surface-raised p-2">
+                  <div className="flex flex-wrap gap-1 font-mono text-[10px] text-ds-on-surface-muted">
+                    {previewList.slice(0, 60).map((t, i) => (
+                      <span
+                        key={i}
+                        className="rounded bg-ds-surface px-1.5 py-0.5"
+                        title={`${t.toFixed(2)}s`}
+                      >
+                        {fmtTime(t)}
+                      </span>
+                    ))}
+                    {previewList.length > 60 && (
+                      <span className="px-1.5 py-0.5 text-ds-on-surface-muted">
+                        + {previewList.length - 60} more…
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {pickMode === "paste" && (
           <div className="mt-4 flex flex-col gap-2">
