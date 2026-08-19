@@ -224,7 +224,9 @@ export const ConceptReelStudio: React.FC = () => {
         // (faster to write on mobile) with no visible quality loss.
         videoBitrate: 6_000_000,
         audioCodec: "aac",
-        hardwareAcceleration: "prefer-hardware",
+        // Let Chrome pick — `prefer-hardware` was hard-failing on machines
+        // without a GPU H264 encoder even though software encode works fine.
+        hardwareAcceleration: "no-preference",
         keyframeIntervalInSeconds: 2,
         delayRenderTimeoutInMilliseconds: 90_000,
         onProgress: ({ progress: p }) => setProgress(p),

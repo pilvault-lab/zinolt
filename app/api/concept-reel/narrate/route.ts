@@ -60,26 +60,36 @@ export async function POST(req: Request) {
       voice,
       rate: "-5%",
     });
-    // Upload to Blob and return a proxy URL instead of base64-inlining. Base64
-    // in JSON killed mobile at ~1 MB+ (JSON.parse stalled the main thread,
-    // huge data URLs OOMed the <audio> element).
+
+    // If we have Blob credentials, upload the mp3 to private Blob and return a
+    // proxy URL. Base64 killed mobile at ~1 MB+ (JSON.parse stall, <audio>
+    // OOM), so this is the production path.
     //
-    // Store is private, so we can't hand out the raw blob URL — we return a
-    // path to /api/concept-reel/narration that streams the mp3 through with
-    // the token server-side. Client uses this as <audio src>.
-    const key = `concept-reel/narrations/${Date.now()}-${randomBytes(4).toString("hex")}.mp3`;
-    await put(key, mp3, {
-      access: "private",
-      contentType: "audio/mpeg",
-      addRandomSuffix: false,
-      cacheControlMaxAge: 60 * 60 * 24 * 7,
-    });
-    return NextResponse.json({
-      audioUrl: `/api/concept-reel/narration?p=${encodeURIComponent(key)}`,
-      words,
-      durationSec,
-      voice,
-    });
+    // If we don't (typical local dev without `vercel env pull` for BLOB_*),
+    // fall back to the old base64 data URL. Works on desktop, breaks on
+    // mobile — same as it always was locally.
+    const hasBlobCreds =
+      !!process.env.BLOB_READ_WRITE_TOKEN ||
+      (!!process.env.VERCEL_OIDC_TOKEN && !!process.env.BLOB_STORE_ID);
+
+    if (hasBlobCreds) {
+      const key = `concept-reel/narrations/${Date.now()}-${randomBytes(4).toString("hex")}.mp3`;
+      await put(key, mp3, {
+        access: "private",
+        contentType: "audio/mpeg",
+        addRandomSuffix: false,
+        cacheControlMaxAge: 60 * 60 * 24 * 7,
+      });
+      return NextResponse.json({
+        audioUrl: `/api/concept-reel/narration?p=${encodeURIComponent(key)}`,
+        words,
+        durationSec,
+        voice,
+      });
+    }
+
+    const audioUrl = `data:audio/mpeg;base64,${mp3.toString("base64")}`;
+    return NextResponse.json({ audioUrl, words, durationSec, voice });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "tts_failed";
     return NextResponse.json({ error: msg }, { status: 502 });
