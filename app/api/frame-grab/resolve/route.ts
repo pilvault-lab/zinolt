@@ -15,7 +15,19 @@ export async function POST(req: Request) {
   const source = (body.source ?? "").trim();
   if (!source) return NextResponse.json({ error: "missing_source" }, { status: 400 });
 
-  const res = await resolveSource(source);
+  let res;
+  try {
+    res = await resolveSource(source);
+  } catch (err) {
+    // yt-dlp / ffmpeg / filesystem calls throw here on Vercel serverless
+    // (binaries not installed, fs mostly read-only). Return the message so
+    // the client shows something useful instead of "Unexpected end of JSON".
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: "resolve_threw", message: msg },
+      { status: 502 },
+    );
+  }
   if ("error" in res) return NextResponse.json(res, { status: 502 });
 
   // Never expose the raw filesystem path — the client uses the video route with `token`.

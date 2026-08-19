@@ -179,12 +179,26 @@ export function FrameGrab() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ source: source.trim() }),
       });
-      const json = await res.json();
+      // Read as text first so a crashed handler (empty/HTML body) shows a
+      // useful message instead of "Unexpected end of JSON input".
+      const raw = await res.text();
+      let json: Record<string, unknown> = {};
+      try {
+        json = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      } catch {
+        // fall through — json stays {}
+      }
       if (!res.ok) {
-        setError(typeof json?.error === "string" ? json.error : `HTTP ${res.status}`);
+        const msg =
+          typeof json.error === "string"
+            ? json.error
+            : raw
+              ? raw.slice(0, 200)
+              : `HTTP ${res.status}`;
+        setError(msg);
         return;
       }
-      setLoaded(json as ResolveResponse);
+      setLoaded(json as unknown as ResolveResponse);
     } catch (e) {
       setError(e instanceof Error ? e.message : "load_failed");
     } finally {
