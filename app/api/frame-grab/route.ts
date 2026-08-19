@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     mode?: string;
     cropOffsetX?: number;
     intervalSec?: number;
+    clipDurationSec?: number;
     windows?: Array<{ startSec?: number; count?: number }>;
     moments?: number[];
     startSec?: number;
@@ -29,6 +30,10 @@ export async function POST(req: Request) {
   const mode: FrameMode = body.mode === "letterboxed" ? "letterboxed" : "full-bleed";
   const cropOffsetX = Math.max(0, Math.min(1, Number(body.cropOffsetX ?? 0.5)));
   const intervalSec = Number(body.intervalSec ?? 0.5);
+  const clipDurationSec = Math.max(
+    0.05,
+    Math.min(10, Number(body.clipDurationSec ?? 0.5)),
+  );
 
   const moments =
     Array.isArray(body.moments) && body.moments.length > 0
@@ -57,6 +62,7 @@ export async function POST(req: Request) {
     mode,
     cropOffsetX,
     intervalSec,
+    clipDurationSec,
     windows,
     moments,
   });

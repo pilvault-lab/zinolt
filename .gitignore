@@ -66,7 +66,8 @@ next-env.d.ts
 # Clip Studio cache (downloaded YouTube videos + cuts)
 .clip-studio-cache/
 
-# Frame Grab extracted frames from local sources (large, regenerable)
+# Frame Grab local uploads + extracted clips (large, regenerable)
+.frame-grab-uploads/
 public/frame-grab/local-*/
 public/frame-grab/picked-*/
 

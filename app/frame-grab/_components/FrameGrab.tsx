@@ -1,15 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Header } from "../../_components/Header";
 import { VideoStage } from "./VideoStage";
+import { putBlob } from "@/lib/hype-edit/blob-store";
+import { loadProject, saveProject } from "@/lib/hype-edit/storage";
+import { EMPTY_PROJECT, type HypeFrame } from "@/lib/hype-edit/types";
 
-type Frame = {
-  src: string; // URL — either server /frame-grab/… path OR blob: URL from client extraction
+type Clip = {
+  src: string;
   sec: number;
-  blob?: Blob; // present for client-extracted frames; skip fetch() for zip download
+  durationSec: number;
+  sizeBytes: number;
 };
 
 type FrameGrabResponse = {
@@ -18,9 +23,10 @@ type FrameGrabResponse = {
   channel: string;
   durationSec: number;
   intervalSec: number;
+  clipDurationSec: number;
   mode: "full-bleed" | "letterboxed";
   cropOffsetX: number;
-  frames: Frame[];
+  clips: Clip[];
 };
 
 type ResolveResponse = {
@@ -33,12 +39,25 @@ type ResolveResponse = {
 
 type Marker = { id: string; sec: number; thumb?: string };
 type WindowRow = { id: string; startStr: string; countStr: string };
-type PickMode = "auto" | "manual";
+type PickMode = "auto" | "manual" | "paste";
+
+type UploadState =
+  | { phase: "idle" }
+  | { phase: "uploading"; name: string; loaded: number; total: number }
+  | { phase: "done"; name: string; serverPath: string }
+  | { phase: "error"; message: string };
 
 const fmtTime = (s: number) => {
   const m = Math.floor(s / 60);
   const sec = (s % 60).toFixed(1);
   return `${m}:${sec.padStart(4, "0")}`;
+};
+
+const fmtBytes = (b: number) => {
+  if (b < 1024) return `${b} B`;
+  const kb = b / 1024;
+  if (kb < 1024) return `${kb.toFixed(0)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
 };
 
 function parseStart(input: string): number {
@@ -51,6 +70,23 @@ function parseStart(input: string): number {
   return Math.max(0, Number(t) || 0);
 }
 
+/**
+ * Parse a free-form paste of timestamps like:
+ *   0:12, 0:45, 1:20
+ *   0:12
+ *   1:20
+ *   62.5 88.2 105
+ */
+function parseTimestampsBlob(raw: string): number[] {
+  const parts = raw.split(/[\s,;\n]+/).map((p) => p.trim()).filter(Boolean);
+  const out: number[] = [];
+  for (const p of parts) {
+    const v = parseStart(p);
+    if (isFinite(v) && v >= 0) out.push(v);
+  }
+  return out;
+}
+
 const newRow = (start = "0", count = "30"): WindowRow => ({
   id: Math.random().toString(36).slice(2, 9),
   startStr: start,
@@ -58,13 +94,14 @@ const newRow = (start = "0", count = "30"): WindowRow => ({
 });
 
 export function FrameGrab() {
+  const router = useRouter();
   const [source, setSource] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // Blob URL for local picks — playback + client-side extraction, no server round-trip.
+
+  // Local pick: instant blob URL for playback + XHR upload → server-side path for ffmpeg.
   const [pickedBlobUrl, setPickedBlobUrl] = useState<string | null>(null);
   const [pickedMeta, setPickedMeta] = useState<{ name: string; sizeMB: number } | null>(null);
-  // True when the loaded video was picked locally (extraction is client-side).
-  const isLocal = !!pickedBlobUrl;
+  const [upload, setUpload] = useState<UploadState>({ phase: "idle" });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +111,7 @@ export function FrameGrab() {
   const [mode, setMode] = useState<"full-bleed" | "letterboxed">("full-bleed");
   const [cropOffsetX, setCropOffsetX] = useState(0.5);
   const [pickMode, setPickMode] = useState<PickMode>("manual");
+  const [clipDurationSec, setClipDurationSec] = useState(0.5);
 
   // Manual mode
   const [markers, setMarkers] = useState<Marker[]>([]);
@@ -82,11 +120,15 @@ export function FrameGrab() {
   const [rows, setRows] = useState<WindowRow[]>([newRow()]);
   const [interval, setInterval] = useState(0.5);
 
+  // Paste mode
+  const [pasteText, setPasteText] = useState("");
+
   // Extraction result
   const [extracting, setExtracting] = useState(false);
   const [result, setResult] = useState<FrameGrabResponse | null>(null);
-  const [hiddenFrames, setHiddenFrames] = useState<Set<string>>(new Set());
+  const [hiddenClips, setHiddenClips] = useState<Set<string>>(new Set());
   const [zipping, setZipping] = useState(false);
+  const [pushingToHype, setPushingToHype] = useState(false);
 
   // VideoStage hooks — VideoStage registers these callbacks with us.
   const grabRef = useRef<() => number | null>(() => null);
@@ -94,6 +136,7 @@ export function FrameGrab() {
   const captureThumbRef = useRef<(sec: number) => Promise<string | null>>(
     async () => null,
   );
+  // Full-frame capture unused for clip extraction, but VideoStage still requires it.
   const captureFullFrameRef = useRef<(sec: number) => Promise<Blob | null>>(
     async () => null,
   );
@@ -103,12 +146,12 @@ export function FrameGrab() {
     setLoaded(null);
     setResult(null);
     setMarkers([]);
-    // Ensure we leave "local" mode when loading via URL/path.
     if (pickedBlobUrl) {
       URL.revokeObjectURL(pickedBlobUrl);
       setPickedBlobUrl(null);
     }
     setPickedMeta(null);
+    setUpload({ phase: "idle" });
     setLoading(true);
     try {
       const res = await fetch("/api/frame-grab/resolve", {
@@ -129,13 +172,12 @@ export function FrameGrab() {
     }
   }, [source, pickedBlobUrl]);
 
-  // Native file picker → play + extract entirely in the browser. No upload.
+  // Native picker: play instantly (blob URL) + stream-upload in background.
   const onFilePicked = useCallback((file: File) => {
     setError(null);
     setResult(null);
     setMarkers([]);
     setLoaded(null);
-    // Revoke any previous blob URL.
     if (pickedBlobUrl) URL.revokeObjectURL(pickedBlobUrl);
     const blobUrl = URL.createObjectURL(file);
     setPickedBlobUrl(blobUrl);
@@ -148,6 +190,34 @@ export function FrameGrab() {
       durationSec: 0,
       streamUrl: blobUrl,
     });
+    // Start upload immediately so the server path is ready when the user hits Extract.
+    setUpload({ phase: "uploading", name: file.name, loaded: 0, total: file.size });
+    const xhr = new XMLHttpRequest();
+    const qs = new URLSearchParams({
+      name: file.name,
+      size: String(file.size),
+      lastModified: String(file.lastModified),
+    });
+    xhr.open("POST", `/api/frame-grab/upload?${qs.toString()}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setUpload({ phase: "uploading", name: file.name, loaded: e.loaded, total: e.total });
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const json = JSON.parse(xhr.responseText) as { path: string };
+          setUpload({ phase: "done", name: file.name, serverPath: json.path });
+        } catch {
+          setUpload({ phase: "error", message: "bad_upload_response" });
+        }
+      } else {
+        setUpload({ phase: "error", message: `upload_failed_${xhr.status}` });
+      }
+    };
+    xhr.onerror = () => setUpload({ phase: "error", message: "upload_network_error" });
+    xhr.send(file);
   }, [pickedBlobUrl]);
 
   const grabMoment = useCallback(async () => {
@@ -155,15 +225,12 @@ export function FrameGrab() {
     if (sec == null) return;
     const id = Math.random().toString(36).slice(2, 9);
     setMarkers((m) => [...m, { id, sec }].sort((a, b) => a.sec - b.sec));
-    // Capture a client-side thumbnail (best-effort, doesn't block).
     void captureThumbRef.current(sec).then((thumb) => {
       if (!thumb) return;
       setMarkers((m) => m.map((k) => (k.id === id ? { ...k, thumb } : k)));
     });
   }, []);
 
-  // Spacebar = grab moment (only when in manual mode and a video is loaded,
-  // and focus isn't in an input).
   useEffect(() => {
     if (!loaded || pickMode !== "manual") return;
     const onKey = (e: KeyboardEvent) => {
@@ -187,7 +254,6 @@ export function FrameGrab() {
         .map((k) => (k.id === id ? { ...k, sec: Math.max(0, k.sec + delta), thumb: undefined } : k))
         .sort((a, b) => a.sec - b.sec),
     );
-    // Re-capture thumb after nudge.
     const marker = markers.find((k) => k.id === id);
     if (marker) {
       const newSec = Math.max(0, marker.sec + delta);
@@ -198,13 +264,19 @@ export function FrameGrab() {
     }
   };
 
-  // Build the list of timestamps to extract from either pick mode.
   const buildMoments = useCallback((): number[] | { error: string } => {
     if (pickMode === "manual") {
       if (markers.length === 0) {
         return { error: "No markers picked — hit Space (or Grab this moment) to add some." };
       }
       return markers.map((m) => m.sec);
+    }
+    if (pickMode === "paste") {
+      const parsed = parseTimestampsBlob(pasteText);
+      if (parsed.length === 0) {
+        return { error: "Paste timestamps separated by spaces, commas, or newlines (e.g. 0:12, 0:45, 1:20)." };
+      }
+      return parsed;
     }
     // Auto: expand windows into a flat list of timestamps.
     const out: number[] = [];
@@ -214,61 +286,54 @@ export function FrameGrab() {
       for (let i = 0; i < count; i++) out.push(start + i * interval);
     }
     return out;
-  }, [pickMode, markers, rows, interval]);
+  }, [pickMode, markers, pasteText, rows, interval]);
 
+  // Extraction runs server-side against either the uploaded copy of a local file,
+  // or the URL/typed path the user pasted.
   const extract = useCallback(async () => {
-    if (!loaded) return;
+    if (!loaded) {
+      setError("Load a video first.");
+      return;
+    }
+    if (pickedBlobUrl && upload.phase === "uploading") {
+      setError(`Still uploading (${Math.round((upload.loaded / upload.total) * 100)}%). Extraction will start when the upload finishes.`);
+      return;
+    }
+    if (pickedBlobUrl && upload.phase === "error") {
+      setError(`Upload failed: ${upload.message}. Re-pick the file.`);
+      return;
+    }
+    const extractionSource =
+      pickedBlobUrl && upload.phase === "done" ? upload.serverPath : source.trim();
+    if (!extractionSource) {
+      setError("No source to extract from. Pick a file or paste a URL/path.");
+      return;
+    }
+    const moments = buildMoments();
+    if (!Array.isArray(moments)) {
+      setError(moments.error);
+      return;
+    }
+
     setError(null);
     setResult(null);
-    setHiddenFrames(new Set());
+    setHiddenClips(new Set());
     setExtracting(true);
-
     try {
-      const moments = buildMoments();
-      if (!Array.isArray(moments)) {
-        setError(moments.error);
-        return;
-      }
-
-      // Native-picked local file → client-side extraction, no upload, no server ffmpeg.
-      if (isLocal) {
-        const frames: Frame[] = [];
-        for (const sec of moments) {
-          const blob = await captureFullFrameRef.current(sec);
-          if (!blob) continue;
-          const url = URL.createObjectURL(blob);
-          frames.push({ src: url, sec, blob });
-        }
-        if (frames.length === 0) {
-          setError("Client extraction produced no frames — the browser may not decode this codec.");
-          return;
-        }
-        setResult({
-          sourceId: loaded.sourceId,
-          title: loaded.title,
-          channel: loaded.channel,
-          durationSec: loaded.durationSec,
-          intervalSec: interval,
-          mode,
-          cropOffsetX,
-          frames,
-        });
-        return;
-      }
-
-      // URL / typed path → server ffmpeg (original path).
       const body: Record<string, unknown> = {
-        source: source.trim(),
+        source: extractionSource,
         mode,
         cropOffsetX,
         intervalSec: interval,
+        clipDurationSec,
       };
-      if (pickMode === "manual") body.moments = moments;
-      else {
+      if (pickMode === "auto") {
         body.windows = rows.map((r) => ({
           startSec: parseStart(r.startStr),
           count: Math.max(1, Math.min(120, Math.floor(Number(r.countStr) || 30))),
         }));
+      } else {
+        body.moments = moments;
       }
       const res = await fetch("/api/frame-grab", {
         method: "POST",
@@ -286,46 +351,54 @@ export function FrameGrab() {
     } finally {
       setExtracting(false);
     }
-  }, [loaded, isLocal, buildMoments, source, mode, cropOffsetX, interval, pickMode, markers, rows]);
+  }, [
+    loaded,
+    pickedBlobUrl,
+    upload,
+    source,
+    mode,
+    cropOffsetX,
+    interval,
+    clipDurationSec,
+    pickMode,
+    rows,
+    buildMoments,
+  ]);
 
-  // Nudge a rendered frame: re-capture just that timestamp ±0.1s.
-  const nudgeResultFrame = useCallback(
-    async (frame: Frame, delta: number) => {
+  // Nudge a rendered clip: re-extract just that timestamp ±0.1s.
+  const nudgeClip = useCallback(
+    async (clip: Clip, delta: number) => {
       if (!loaded) return;
-      const newSec = Math.max(0, frame.sec + delta);
+      const extractionSource =
+        pickedBlobUrl && upload.phase === "done" ? upload.serverPath : source.trim();
+      if (!extractionSource) return;
+      const newSec = Math.max(0, clip.sec + delta);
       try {
-        let replacement: Frame | null = null;
-        if (isLocal) {
-          const blob = await captureFullFrameRef.current(newSec);
-          if (!blob) return;
-          // Revoke the old blob URL to free memory.
-          if (frame.src.startsWith("blob:")) URL.revokeObjectURL(frame.src);
-          replacement = { src: URL.createObjectURL(blob), sec: newSec, blob };
-        } else {
-          const res = await fetch("/api/frame-grab", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              source: source.trim(),
-              mode,
-              cropOffsetX,
-              moments: [newSec],
-            }),
-          });
-          const json = await res.json();
-          if (!res.ok) {
-            setError(typeof json?.error === "string" ? json.error : `HTTP ${res.status}`);
-            return;
-          }
-          const r = (json as FrameGrabResponse).frames[0];
-          if (!r) return;
-          replacement = { ...r, src: `${r.src}?v=${Date.now()}` };
+        const res = await fetch("/api/frame-grab", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            source: extractionSource,
+            mode,
+            cropOffsetX,
+            clipDurationSec,
+            moments: [newSec],
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setError(typeof json?.error === "string" ? json.error : `HTTP ${res.status}`);
+          return;
         }
+        const replacement = (json as FrameGrabResponse).clips[0];
+        if (!replacement) return;
+        // Cache-bust: append ?v=Date.now() so the <video> reloads the new file.
+        const cacheBusted = { ...replacement, src: `${replacement.src}?v=${Date.now()}` };
         setResult((r) =>
-          r && replacement
+          r
             ? {
                 ...r,
-                frames: r.frames.map((f) => (f.src === frame.src ? replacement! : f)),
+                clips: r.clips.map((c) => (c.src === clip.src ? cacheBusted : c)),
               }
             : r,
         );
@@ -333,26 +406,24 @@ export function FrameGrab() {
         setError(e instanceof Error ? e.message : "nudge_failed");
       }
     },
-    [loaded, isLocal, source, mode, cropOffsetX],
+    [loaded, pickedBlobUrl, upload, source, mode, cropOffsetX, clipDurationSec],
   );
 
-  const visibleFrames = useMemo(
-    () => (result ? result.frames.filter((f) => !hiddenFrames.has(f.src)) : []),
-    [result, hiddenFrames],
+  const visibleClips = useMemo(
+    () => (result ? result.clips.filter((c) => !hiddenClips.has(c.src)) : []),
+    [result, hiddenClips],
   );
 
   const downloadZip = useCallback(async () => {
-    if (!result || visibleFrames.length === 0) return;
+    if (!result || visibleClips.length === 0) return;
     setZipping(true);
     try {
       const zip = new JSZip();
       const root = zip.folder(result.sourceId) ?? zip;
       await Promise.all(
-        visibleFrames.map(async (f, i) => {
-          const blob: Blob = f.blob
-            ? f.blob
-            : await fetch(f.src).then((r) => r.blob());
-          const name = `${String(i + 1).padStart(3, "0")}_${Math.round(f.sec * 1000)}ms.jpg`;
+        visibleClips.map(async (c, i) => {
+          const blob = await fetch(c.src).then((r) => r.blob());
+          const name = `${String(i + 1).padStart(3, "0")}_${Math.round(c.sec * 1000)}ms.mp4`;
           root.file(name, blob);
         }),
       );
@@ -360,7 +431,7 @@ export function FrameGrab() {
       const a = document.createElement("a");
       const href = URL.createObjectURL(blob);
       a.href = href;
-      a.download = `${result.sourceId}-frames.zip`;
+      a.download = `${result.sourceId}-clips.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -368,7 +439,47 @@ export function FrameGrab() {
     } finally {
       setZipping(false);
     }
-  }, [result, visibleFrames]);
+  }, [result, visibleClips]);
+
+  const pushToHypeEdit = useCallback(
+    async (replaceExisting: boolean) => {
+      if (!result || visibleClips.length === 0) return;
+      setPushingToHype(true);
+      try {
+        // Fetch each clip as a Blob and stash it in Hype Edit's IndexedDB store.
+        const uuid = () =>
+          typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+        const newFrames: HypeFrame[] = [];
+        for (const c of visibleClips) {
+          const blob = await fetch(c.src).then((r) => r.blob());
+          const id = uuid();
+          await putBlob(id, blob);
+          newFrames.push({
+            id,
+            kind: "video",
+            src: URL.createObjectURL(blob),
+            label: `${result.sourceId} · ${c.sec.toFixed(1)}s`,
+            session: true,
+          });
+        }
+
+        const existing = (await loadProject()) ?? EMPTY_PROJECT;
+        const merged = replaceExisting
+          ? { ...existing, frames: newFrames }
+          : { ...existing, frames: [...existing.frames, ...newFrames] };
+        saveProject(merged);
+
+        router.push("/hype-edit");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "push_to_hype_failed");
+        setPushingToHype(false);
+      }
+    },
+    [result, visibleClips, router],
+  );
 
   const patchRow = (id: string, patch: Partial<WindowRow>) =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -376,13 +487,19 @@ export function FrameGrab() {
     setRows((rs) => (rs.length <= 1 ? rs : rs.filter((r) => r.id !== id)));
   const addRow = () => setRows((rs) => [...rs, newRow()]);
 
+  const uploadPct =
+    upload.phase === "uploading"
+      ? Math.round((upload.loaded / upload.total) * 100)
+      : 0;
+
   return (
     <div className="min-h-screen bg-ds-surface text-ds-on-surface">
       <Header />
       <main className="mx-auto max-w-6xl px-6 py-8">
         <h1 className="text-3xl font-semibold tracking-tight">Frame Grab</h1>
         <p className="mt-2 text-sm text-ds-on-surface-muted">
-          Click <span className="text-ds-on-surface">Choose file</span> for a local video — nothing is uploaded, the browser does the cropping and extraction. For a YouTube link, paste and hit <span className="text-ds-on-surface">Load URL</span> (server-side via yt-dlp). Then drag the 9:16 crop, scrub, and hand-pick moments — or use even-spaced Auto mode.
+          Cut a video into a batch of short vertical clips ({clipDurationSec.toFixed(2)}s each, 1080×1920)
+          for use in a montage. Pick moments visually, or paste timestamps blind if the browser can&apos;t play your file.
         </p>
 
         {/* Source row */}
@@ -392,7 +509,7 @@ export function FrameGrab() {
               type="text"
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=…  OR  C:\path\to\scenepack.mp4"
+              placeholder="YouTube URL or a local file path (e.g. C:\scenepacks\pack.mp4 — no upload needed)"
               className="w-full rounded-md border border-ds-border-hairline bg-ds-surface-raised px-4 py-3 text-sm outline-none focus:border-ds-primary"
             />
             <Button
@@ -417,9 +534,36 @@ export function FrameGrab() {
             </Button>
           </div>
 
-          {pickedMeta && (
+          {upload.phase === "uploading" && pickedMeta && (
+            <div className="rounded-md border border-ds-border-hairline bg-ds-surface-raised px-3 py-2 text-xs text-ds-on-surface">
+              <div className="flex items-center justify-between">
+                <span className="truncate">
+                  Uploading <span className="text-ds-on-surface">{pickedMeta.name}</span>{" "}
+                  ({pickedMeta.sizeMB.toFixed(1)} MB)…
+                </span>
+                <span className="tabular-nums text-ds-on-surface-muted">
+                  {uploadPct}%
+                </span>
+              </div>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-ds-border-hairline">
+                <div
+                  className="h-full bg-ds-primary transition-all"
+                  style={{ width: `${uploadPct}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[10px] text-ds-on-surface-muted">
+                Scrub + pick moments while this finishes. Extract will wait for the upload.
+              </div>
+            </div>
+          )}
+          {upload.phase === "done" && pickedMeta && (
             <div className="text-[11px] text-ds-on-surface-muted">
-              ✓ <span className="text-ds-on-surface">{pickedMeta.name}</span> — {pickedMeta.sizeMB.toFixed(1)} MB · nothing uploaded, extraction runs in your browser
+              ✓ <span className="text-ds-on-surface">{pickedMeta.name}</span> ready ({pickedMeta.sizeMB.toFixed(1)} MB uploaded).
+            </div>
+          )}
+          {upload.phase === "error" && (
+            <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+              Upload failed: {upload.message}. Try picking the file again.
             </div>
           )}
 
@@ -452,6 +596,18 @@ export function FrameGrab() {
                 </span>
               </label>
             )}
+            <label className="flex items-center gap-2 text-xs text-ds-on-surface-muted">
+              Clip length (s)
+              <input
+                type="number"
+                min="0.1"
+                max="10"
+                step="0.1"
+                value={clipDurationSec}
+                onChange={(e) => setClipDurationSec(Math.max(0.1, Math.min(10, Number(e.target.value) || 0.5)))}
+                className="w-20 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-2 py-1.5 text-sm outline-none focus:border-ds-primary"
+              />
+            </label>
           </div>
         </div>
 
@@ -461,8 +617,8 @@ export function FrameGrab() {
           </div>
         )}
 
-        {/* Video stage */}
-        {loaded && (
+        {/* Video stage — only when the browser can play the file */}
+        {loaded && pickMode !== "paste" && (
           <div className="mt-6 flex flex-col gap-4 rounded-md border border-ds-border-hairline bg-ds-surface-raised p-4">
             <div className="text-xs text-ds-on-surface-muted">
               <span className="text-ds-on-surface">{loaded.title}</span>
@@ -481,181 +637,168 @@ export function FrameGrab() {
               registerCaptureThumb={(fn) => (captureThumbRef.current = fn)}
               registerCaptureFullFrame={(fn) => (captureFullFrameRef.current = fn)}
             />
+          </div>
+        )}
 
-            {/* Pick mode tabs */}
-            <div className="flex items-center gap-1 border-b border-ds-border-hairline">
-              {(["manual", "auto"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setPickMode(m)}
-                  className={`px-4 py-2 text-xs uppercase tracking-widest ${
-                    pickMode === m
-                      ? "border-b-2 border-ds-primary text-ds-on-surface"
-                      : "text-ds-on-surface-muted hover:text-ds-on-surface"
-                  }`}
-                >
-                  {m === "manual" ? "Manual (pick)" : "Auto (interval)"}
-                </button>
-              ))}
-              <div className="ml-auto flex items-center gap-2">
-                <Button
-                  onClick={extract}
-                  disabled={extracting}
-                  variant="pill-primary"
-                  size="pill"
-                >
-                  {extracting ? "Extracting…" : "Extract frames"}
-                </Button>
-              </div>
+        {/* Pick mode tabs — visible always so you can switch to Paste even if the player is black */}
+        {(loaded || pickMode === "paste") && (
+          <div className="mt-4 flex items-center gap-1 border-b border-ds-border-hairline">
+            {(["manual", "auto", "paste"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setPickMode(m)}
+                className={`px-4 py-2 text-xs uppercase tracking-widest ${
+                  pickMode === m
+                    ? "border-b-2 border-ds-primary text-ds-on-surface"
+                    : "text-ds-on-surface-muted hover:text-ds-on-surface"
+                }`}
+              >
+                {m === "manual" ? "Manual (pick)" : m === "auto" ? "Auto (interval)" : "Paste timestamps"}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center gap-2 py-1">
+              <Button
+                onClick={extract}
+                disabled={extracting}
+                variant="pill-primary"
+                size="pill"
+              >
+                {extracting ? "Extracting…" : "Extract clips"}
+              </Button>
             </div>
+          </div>
+        )}
 
-            {pickMode === "manual" && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3 text-xs">
-                  <Button onClick={grabMoment} variant="outline">
-                    Grab this moment  <span className="ml-2 text-[10px] text-ds-on-surface-muted">Space</span>
-                  </Button>
-                  <span className="text-ds-on-surface-muted">
-                    At {fmtTime(currentTime)} · {markers.length} picked
-                  </span>
-                </div>
-
-                {/* Timeline with marker pins */}
-                <MarkerTimeline
-                  duration={loaded.durationSec}
-                  markers={markers}
-                  currentSec={currentTime}
-                  onSeek={(sec) => seekRef.current(sec)}
-                />
-
-                {markers.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8">
-                    {markers.map((mk, i) => (
-                      <div
-                        key={mk.id}
-                        className="group relative overflow-hidden rounded-md border border-ds-border-hairline bg-ds-surface-raised"
-                      >
-                        <button
-                          onClick={() => seekRef.current(mk.sec)}
-                          className="block w-full"
-                          title="Seek here"
-                        >
-                          {mk.thumb ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={mk.thumb}
-                              alt=""
-                              className="aspect-[9/16] w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex aspect-[9/16] w-full items-center justify-center text-[10px] text-ds-on-surface-muted">
-                              …
-                            </div>
-                          )}
-                        </button>
-                        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-white/85 text-ds-on-surface backdrop-blur-sm px-1.5 py-0.5 text-[10px]">
-                          <span className="tabular-nums">
-                            {String(i + 1).padStart(2, "0")} · {fmtTime(mk.sec)}
-                          </span>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => nudgeMarker(mk.id, -0.1)}
-                              className="rounded bg-ds-surface-raised px-1 hover:opacity-80"
-                              title="-0.1s"
-                            >
-                              −
-                            </button>
-                            <button
-                              onClick={() => nudgeMarker(mk.id, 0.1)}
-                              className="rounded bg-ds-surface-raised px-1 hover:opacity-80"
-                              title="+0.1s"
-                            >
-                              +
-                            </button>
-                            <button
-                              onClick={() => removeMarker(mk.id)}
-                              className="rounded bg-red-500/90 px-1 text-white hover:bg-red-600"
-                              title="Remove"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
+        {loaded && pickMode === "manual" && (
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex items-center gap-3 text-xs">
+              <Button onClick={grabMoment} variant="outline">
+                Grab this moment <span className="ml-2 text-[10px] text-ds-on-surface-muted">Space</span>
+              </Button>
+              <span className="text-ds-on-surface-muted">
+                At {fmtTime(currentTime)} · {markers.length} picked
+              </span>
+            </div>
+            <MarkerTimeline
+              duration={loaded.durationSec}
+              markers={markers}
+              currentSec={currentTime}
+              onSeek={(sec) => seekRef.current(sec)}
+            />
+            {markers.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8">
+                {markers.map((mk, i) => (
+                  <div
+                    key={mk.id}
+                    className="group relative overflow-hidden rounded-md border border-ds-border-hairline bg-ds-surface-raised"
+                  >
+                    <button
+                      onClick={() => seekRef.current(mk.sec)}
+                      className="block w-full"
+                      title="Seek here"
+                    >
+                      {mk.thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mk.thumb} alt="" className="aspect-[9/16] w-full object-cover" />
+                      ) : (
+                        <div className="flex aspect-[9/16] w-full items-center justify-center text-[10px] text-ds-on-surface-muted">…</div>
+                      )}
+                    </button>
+                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-white/85 px-1.5 py-0.5 text-[10px] text-ds-on-surface backdrop-blur-sm">
+                      <span className="tabular-nums">
+                        {String(i + 1).padStart(2, "0")} · {fmtTime(mk.sec)}
+                      </span>
+                      <div className="flex gap-1">
+                        <button onClick={() => nudgeMarker(mk.id, -0.1)} className="rounded bg-ds-surface-raised px-1 hover:opacity-80" title="-0.1s">−</button>
+                        <button onClick={() => nudgeMarker(mk.id, 0.1)} className="rounded bg-ds-surface-raised px-1 hover:opacity-80" title="+0.1s">+</button>
+                        <button onClick={() => removeMarker(mk.id)} className="rounded bg-red-500/90 px-1 text-white hover:bg-red-600" title="Remove">×</button>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             )}
+          </div>
+        )}
 
-            {pickMode === "auto" && (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-end gap-3">
-                  <label className="flex flex-col gap-1 text-xs text-ds-on-surface-muted">
-                    Interval (s)
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={interval}
-                      onChange={(e) => setInterval(Math.max(0.1, Number(e.target.value) || 0.5))}
-                      className="w-24 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-3 py-2 text-sm outline-none focus:border-ds-primary"
-                    />
-                  </label>
-                </div>
-                <div className="rounded-md border border-ds-border-hairline bg-ds-surface-raised p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-wider text-ds-on-surface-muted">
-                      Windows ({rows.length})
-                    </div>
-                    <Button size="xs" variant="outline" onClick={addRow}>
-                      + Add window
+        {loaded && pickMode === "auto" && (
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs text-ds-on-surface-muted">
+                Interval between clip starts (s)
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  value={interval}
+                  onChange={(e) => setInterval(Math.max(0.1, Number(e.target.value) || 0.5))}
+                  className="w-24 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-3 py-2 text-sm outline-none focus:border-ds-primary"
+                />
+              </label>
+            </div>
+            <div className="rounded-md border border-ds-border-hairline bg-ds-surface-raised p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs uppercase tracking-wider text-ds-on-surface-muted">Windows ({rows.length})</div>
+                <Button size="xs" variant="outline" onClick={addRow}>+ Add window</Button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {rows.map((r, i) => (
+                  <div key={r.id} className="flex items-center gap-2">
+                    <span className="w-6 text-right text-xs tabular-nums text-ds-on-surface-muted">{i + 1}.</span>
+                    <label className="flex flex-col gap-1 text-[10px] text-ds-on-surface-muted">
+                      start
+                      <input
+                        type="text"
+                        value={r.startStr}
+                        onChange={(e) => patchRow(r.id, { startStr: e.target.value })}
+                        className="w-28 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-2 py-1.5 text-sm outline-none focus:border-ds-primary"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-[10px] text-ds-on-surface-muted">
+                      count
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={r.countStr}
+                        onChange={(e) => patchRow(r.id, { countStr: e.target.value })}
+                        className="w-20 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-2 py-1.5 text-sm outline-none focus:border-ds-primary"
+                      />
+                    </label>
+                    <span className="text-[11px] text-ds-on-surface-muted">
+                      {(Math.max(1, Number(r.countStr) || 0) * interval).toFixed(1)}s span · {Math.max(1, Number(r.countStr) || 0)} clips
+                    </span>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => removeRow(r.id)}
+                      disabled={rows.length <= 1}
+                      className="ml-auto text-ds-on-surface-muted hover:text-ds-on-surface"
+                    >
+                      remove
                     </Button>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    {rows.map((r, i) => (
-                      <div key={r.id} className="flex items-center gap-2">
-                        <span className="w-6 text-right text-xs tabular-nums text-ds-on-surface-muted">
-                          {i + 1}.
-                        </span>
-                        <label className="flex flex-col gap-1 text-[10px] text-ds-on-surface-muted">
-                          start
-                          <input
-                            type="text"
-                            value={r.startStr}
-                            onChange={(e) => patchRow(r.id, { startStr: e.target.value })}
-                            className="w-28 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-2 py-1.5 text-sm outline-none focus:border-ds-primary"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-1 text-[10px] text-ds-on-surface-muted">
-                          count
-                          <input
-                            type="number"
-                            min="1"
-                            max="120"
-                            value={r.countStr}
-                            onChange={(e) => patchRow(r.id, { countStr: e.target.value })}
-                            className="w-20 rounded-md border border-ds-border-hairline bg-ds-surface-raised px-2 py-1.5 text-sm outline-none focus:border-ds-primary"
-                          />
-                        </label>
-                        <span className="text-[11px] text-ds-on-surface-muted">
-                          {(Math.max(1, Number(r.countStr) || 0) * interval).toFixed(1)}s window
-                        </span>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => removeRow(r.id)}
-                          disabled={rows.length <= 1}
-                          className="ml-auto text-ds-on-surface-muted hover:text-ds-on-surface"
-                        >
-                          remove
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
-            )}
+            </div>
+          </div>
+        )}
+
+        {pickMode === "paste" && (
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="text-xs text-ds-on-surface-muted">
+              Paste start times separated by spaces, commas, or newlines. Formats: <code>0:12</code>, <code>1:20.5</code>, or plain seconds <code>62.5</code>. One clip per timestamp.
+            </div>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder={"0:12  0:45  1:20  1:44  2:20"}
+              rows={5}
+              className="w-full rounded-md border border-ds-border-hairline bg-ds-surface-raised px-3 py-2 font-mono text-sm outline-none focus:border-ds-primary"
+            />
+            <div className="text-[11px] text-ds-on-surface-muted">
+              {parseTimestampsBlob(pasteText).length} timestamp(s) parsed
+            </div>
           </div>
         )}
 
@@ -664,59 +807,83 @@ export function FrameGrab() {
           <div className="mt-8">
             <div className="mb-3 flex items-center gap-3">
               <div className="text-sm text-ds-on-surface-muted">
-                {visibleFrames.length} of {result.frames.length} frames · {result.mode}
+                {visibleClips.length} of {result.clips.length} clips · {result.mode} · {result.clipDurationSec}s each
               </div>
               <Button
                 variant="outline"
                 onClick={downloadZip}
-                disabled={zipping || visibleFrames.length === 0}
+                disabled={zipping || visibleClips.length === 0}
               >
                 {zipping ? "Zipping…" : "Download .zip"}
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => void pushToHypeEdit(false)}
+                disabled={pushingToHype || visibleClips.length === 0}
+                title="Append these clips to your Hype Edit project"
+              >
+                {pushingToHype ? "Sending…" : "→ Add to Hype Edit"}
+              </Button>
+              <Button
+                variant="pill-primary"
+                size="pill"
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Replace all existing frames in your Hype Edit project with these clips?",
+                    )
+                  ) {
+                    void pushToHypeEdit(true);
+                  }
+                }}
+                disabled={pushingToHype || visibleClips.length === 0}
+                title="Replace all Hype Edit frames with these clips"
+              >
+                {pushingToHype ? "Sending…" : "→ Replace Hype Edit frames"}
+              </Button>
             </div>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-              {result.frames.map((f, i) => {
-                const hidden = hiddenFrames.has(f.src);
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+              {result.clips.map((c, i) => {
+                const hidden = hiddenClips.has(c.src);
                 return (
                   <div
-                    key={f.src}
-                    className={`group relative overflow-hidden rounded-md border border-ds-border-hairline bg-ds-surface-raised ${
-                      hidden ? "opacity-30" : ""
-                    }`}
+                    key={c.src}
+                    className={`group relative overflow-hidden rounded-md border border-ds-border-hairline bg-ds-surface-raised ${hidden ? "opacity-30" : ""}`}
                   >
-                    <a href={f.src} download className="block">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={f.src}
-                        alt={`frame ${i + 1}`}
-                        className="aspect-[9/16] w-full object-cover"
-                      />
+                    <video
+                      src={c.src}
+                      muted
+                      loop
+                      playsInline
+                      onMouseEnter={(e) => void (e.currentTarget as HTMLVideoElement).play().catch(() => {})}
+                      onMouseLeave={(e) => {
+                        const v = e.currentTarget as HTMLVideoElement;
+                        v.pause();
+                        v.currentTime = 0;
+                      }}
+                      className="aspect-[9/16] w-full bg-black object-cover"
+                    />
+                    <a
+                      href={c.src}
+                      download
+                      className="absolute right-1 top-1 rounded bg-white/85 px-1.5 py-0.5 text-[10px] text-ds-on-surface backdrop-blur-sm hover:opacity-80"
+                      title="Download clip"
+                    >
+                      ↓
                     </a>
-                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-white/85 text-ds-on-surface backdrop-blur-sm px-1.5 py-1 text-[10px]">
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-white/85 px-1.5 py-1 text-[10px] text-ds-on-surface backdrop-blur-sm">
                       <span className="tabular-nums">
-                        {String(i + 1).padStart(2, "0")} · {fmtTime(f.sec)}
+                        {String(i + 1).padStart(2, "0")} · {fmtTime(c.sec)} · {fmtBytes(c.sizeBytes)}
                       </span>
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => nudgeResultFrame(f, -0.1)}
-                          className="rounded bg-ds-surface-raised px-1.5 hover:opacity-80"
-                          title="Regrab −0.1s"
-                        >
-                          −
-                        </button>
-                        <button
-                          onClick={() => nudgeResultFrame(f, 0.1)}
-                          className="rounded bg-ds-surface-raised px-1.5 hover:opacity-80"
-                          title="Regrab +0.1s"
-                        >
-                          +
-                        </button>
+                        <button onClick={() => nudgeClip(c, -0.1)} className="rounded bg-ds-surface-raised px-1.5 hover:opacity-80" title="Regrab −0.1s">−</button>
+                        <button onClick={() => nudgeClip(c, 0.1)} className="rounded bg-ds-surface-raised px-1.5 hover:opacity-80" title="Regrab +0.1s">+</button>
                         <button
                           onClick={() =>
-                            setHiddenFrames((h) => {
+                            setHiddenClips((h) => {
                               const n = new Set(h);
-                              if (n.has(f.src)) n.delete(f.src);
-                              else n.add(f.src);
+                              if (n.has(c.src)) n.delete(c.src);
+                              else n.add(c.src);
                               return n;
                             })
                           }
@@ -765,7 +932,7 @@ function MarkerTimeline({
       className="relative h-8 w-full cursor-pointer rounded-md border border-ds-border-hairline bg-ds-surface-raised"
     >
       <div
-        className="absolute top-0 h-full w-[2px] bg-ds-primary/80"
+        className="absolute top-0 h-full w-[2px] bg-ds-primary"
         style={{ left: `${(currentSec / d) * 100}%` }}
       />
       {markers.map((m) => (
