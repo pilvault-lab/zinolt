@@ -1,7 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
+import { put } from "@vercel/blob";
 import { synthesizeNarration } from "@/lib/tts";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
  * Brand narrator + audition set. Change DEFAULT_VOICE to lock a new brand voice.
@@ -23,7 +26,10 @@ export const ALLOWED_VOICES = [
   "en-US-EmmaMultilingualNeural",
 ] as const;
 
-const MAX_TEXT_CHARS = 1200;
+// Was 1200 (~90s narration). Bumped now that we upload to Blob instead of
+// base64-inlining in the JSON response — the mobile OOM/parse-stall was the
+// real cap, not the text size itself.
+const MAX_TEXT_CHARS = 4000;
 
 function sanitize(text: string): string {
   return text
@@ -54,8 +60,22 @@ export async function POST(req: Request) {
       voice,
       rate: "-5%",
     });
-    const audio = `data:audio/mpeg;base64,${mp3.toString("base64")}`;
-    return NextResponse.json({ audio, words, durationSec, voice });
+    // Upload to Blob and return a URL instead of base64-inlining. Base64 in
+    // JSON killed mobile at ~1 MB+ (JSON.parse stalled the main thread, huge
+    // data URLs OOMed the <audio> element). URL streams natively.
+    const key = `concept-reel/narrations/${Date.now()}-${randomBytes(4).toString("hex")}.mp3`;
+    const blob = await put(key, mp3, {
+      access: "public",
+      contentType: "audio/mpeg",
+      addRandomSuffix: false,
+      cacheControlMaxAge: 60 * 60 * 24 * 7,
+    });
+    return NextResponse.json({
+      audioUrl: blob.url,
+      words,
+      durationSec,
+      voice,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "tts_failed";
     return NextResponse.json({ error: msg }, { status: 502 });

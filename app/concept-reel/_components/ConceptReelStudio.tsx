@@ -133,7 +133,7 @@ export const ConceptReelStudio: React.FC = () => {
         throw new Error(j.error || `narrate_${res.status}`);
       }
       const data = (await res.json()) as {
-        audio: string;
+        audioUrl: string;
         words: ConceptReelWord[];
         durationSec: number;
       };
@@ -141,7 +141,7 @@ export const ConceptReelStudio: React.FC = () => {
         throw new Error("no_word_boundaries");
       }
       const state: NarrationState = {
-        audioSrc: data.audio,
+        audioSrc: data.audioUrl,
         words: data.words,
         durationSec: data.durationSec,
         key,
