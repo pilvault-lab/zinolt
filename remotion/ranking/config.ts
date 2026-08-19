@@ -42,8 +42,8 @@ export const RK_SECTIONS = {
   rise:   { start: 0.3 },
   /** Winner lock-in — computed at render time from rise end. */
   hold:   { extraSec: 3.0 },
-  /** CTA card slides in at the end — held for a full beat. */
-  ctaSec: 2.2,
+  /** CTA is disabled — set to 0 to drop the tail. Kept for future use. */
+  ctaSec: 0,
 } as const;
 
 export const sec = (s: number) => Math.round(s * RK_FPS);

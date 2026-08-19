@@ -8,12 +8,11 @@ import {
   useVideoConfig,
   Sequence,
   staticFile,
-  delayRender,
-  continueRender,
   Easing,
 } from "remotion";
 import type { Ranking } from "../../lib/ranking/types";
 import richestMen2026 from "../../lib/ranking/data/richest-men-2026";
+import { RANKINGS } from "../../lib/ranking";
 import {
   RK_FPS,
   RK_HEIGHT,
@@ -40,17 +39,20 @@ import {
 } from "../../lib/motion";
 
 /* ---------- Fonts — Vernavle EVERYWHERE. --------------------------------- */
+/**
+ * Fire-and-forget font load. We deliberately do NOT wrap this in
+ * delayRender — FontFace.load() occasionally hangs indefinitely on parallel
+ * Puppeteer workers, and setTimeout can't rescue it (Remotion pauses the
+ * clock between frames). If Vernavle hasn't loaded by first frame the
+ * fallback (Times New Roman) shows for a fraction of a second, then swaps.
+ */
 const loadFontOnce = (family: string, path: string) => {
   if (typeof window === "undefined") return;
-  const handle = delayRender(family);
   const face = new FontFace(family, `url(${staticFile(path)}) format('woff2')`);
   face
     .load()
-    .then(() => {
-      document.fonts.add(face);
-      continueRender(handle);
-    })
-    .catch(() => continueRender(handle));
+    .then(() => { document.fonts.add(face); })
+    .catch(() => { /* fall back to system serif */ });
 };
 loadFontOnce("Vernavle", "brand/vernavle-font.woff2");
 
@@ -61,6 +63,12 @@ const VERNAVLE_LOGO = staticFile("brand/vernavle-logo.png");
 
 export type RankingProps = {
   ranking: Ranking;
+  /**
+   * Optional slug — when set (and matches a registered ranking), overrides
+   * `ranking`. Lets the CLI pass a simple string via --props instead of the
+   * full data object.
+   */
+  slug?: string;
   titleOverride?: string;
   /** Number of ranked entries to show. Default = RK_DEFAULT_TOP_N (5). */
   topN?: number;
@@ -83,8 +91,16 @@ export const rankingDefaultProps: RankingProps = {
  * and let the tabular-nums font handle the visual stability.
  */
 function formatValue(v: number, fmt: Ranking["format"]): string {
-  const n = Math.round(v);
   const fmtN = (x: number) => x.toLocaleString("en-US");
+  const one = (x: number) =>
+    (Math.round(x * 10) / 10).toLocaleString("en-US", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+  if (fmt === "usd-t") return `$${one(v)}T`;
+  if (fmt === "usd-b1") return `$${one(v)}B`;
+  if (fmt === "num-b") return `${one(v)}B`;
+  const n = Math.round(v);
   switch (fmt) {
     case "usd-b": return `$${fmtN(n)}B`;
     case "usd-m": return `$${fmtN(n)}M`;
@@ -104,11 +120,6 @@ function autoTitleForN(rawTitle: string, topN: number): string {
   return rawTitle.replace(/^\s*Top\s+\d+\b/i, `Top ${topN}`);
 }
 
-/** Return only the surname (last space-separated token) for compact labels. */
-function lastName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  return parts[parts.length - 1] || fullName;
-}
 
 /* ---------- Corner watermark -------------------------------------------- */
 
@@ -189,9 +200,12 @@ const Pedestal: React.FC<{
   useInitials: boolean;
   isWinner: boolean;
   geom: ReturnType<typeof computePedestalGeom>;
+  portraitBg: "dark" | "light";
 }> = ({
-  entry, fmt, targetHeightPx, x, entryStartFrame, lockFrame, useInitials, isWinner, geom,
+  entry, fmt, targetHeightPx, x, entryStartFrame, lockFrame, useInitials, isWinner, geom, portraitBg: rankingPortraitBg,
 }) => {
+  // Per-entry override wins.
+  const portraitBg = entry.portraitBg ?? rankingPortraitBg;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -307,7 +321,8 @@ const Pedestal: React.FC<{
         {formatValue(displayValue, fmt)}
       </div>
 
-      {/* Portrait circle. */}
+      {/* Portrait circle. Background depends on portraitBg — use "light" for
+          rankings whose logos are dark (would disappear on a dark circle). */}
       <div
         style={{
           position: "absolute",
@@ -321,7 +336,7 @@ const Pedestal: React.FC<{
           boxShadow: isWinner && winnerBloom > 0.1
             ? `0 0 ${glowBlurPx}px rgba(255,255,255,${glowStrength})`
             : "0 4px 24px rgba(0,0,0,0.6)",
-          background: "#1A1A1A",
+          background: portraitBg === "light" ? "#F5F5F5" : "#1A1A1A",
           filter: blurPx > 0.4 ? `blur(${blurPx * 0.7}px)` : undefined,
           willChange: "filter, box-shadow",
         }}
@@ -330,9 +345,21 @@ const Pedestal: React.FC<{
           <Img
             src={staticFile((entry.image as string).replace(/^\//, ""))}
             alt={entry.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              // Logos need `contain` (else they crop to the circle). Portrait
+              // photos want `cover` (fill the circle, crop to face). Heuristic:
+              // light bg = logo-mode → contain with padding; dark = portrait → cover.
+              objectFit: portraitBg === "light" ? "contain" : "cover",
+              padding: portraitBg === "light" ? portraitSize * 0.14 : 0,
+              boxSizing: "border-box",
+            }}
           />
         ) : (
+          // No-image fallback: gradient circle with the rank number, not
+          // initials (initials look low-effort in a final render). Matches
+          // the ghost-rank inside the pedestal.
           <div
             style={{
               width: "100%",
@@ -341,13 +368,17 @@ const Pedestal: React.FC<{
               alignItems: "center",
               justifyContent: "center",
               fontFamily: FONT,
-              fontSize: portraitSize * 0.42,
-              color: "#fff",
-              letterSpacing: "-0.02em",
-              background: "linear-gradient(135deg,#2A2A2A 0%,#0F0F0F 100%)",
+              fontSize: portraitSize * 0.55,
+              color: portraitBg === "light" ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.75)",
+              letterSpacing: "-0.05em",
+              lineHeight: 0.9,
+              background:
+                portraitBg === "light"
+                  ? "linear-gradient(135deg,#F5F5F5 0%,#DCDCDC 100%)"
+                  : "linear-gradient(135deg,#2A2A2A 0%,#0F0F0F 100%)",
             }}
           >
-            {initials}
+            {entry.rank}
           </div>
         )}
       </div>
@@ -390,30 +421,41 @@ const Pedestal: React.FC<{
         </div>
       </div>
 
-      {/* Horizontal name label — SURNAME only for compactness. Sits just
-          below the base line, inside the safe band. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: RK_LAYOUT.nameLabelTop,
-          width: barW,
-          height: RK_LAYOUT.nameLabelHeight,
-          fontFamily: FONT,
-          fontSize: geom.nameLabelSize,
-          color: "rgba(255,255,255,0.9)",
-          letterSpacing: "-0.005em",
-          textTransform: "uppercase",
-          textAlign: "center",
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
-          padding: "0 2px",
-          fontFeatureSettings: '"kern" 1',
-        }}
-      >
-        {lastName(entry.name)}
-      </div>
+      {/* Horizontal name label — SINGLE line, font auto-shrinks per-entry
+          so the full name always fits under the bar. No ellipsis, no wrap. */}
+      {(() => {
+        const available = barW - 4;
+        const defaultFont = geom.nameLabelSize;
+        // Vernavle serif ≈ 0.55 em avg char width, uppercase.
+        const estCharEm = 0.55;
+        const wantFont = available / (entry.name.length * estCharEm);
+        const nameFontSize = Math.max(
+          8,
+          Math.min(defaultFont, Math.floor(wantFont)),
+        );
+        return (
+          <div
+            style={{
+              position: "absolute",
+              left: -barW,               // extend beyond bar edges so long names
+              top: RK_LAYOUT.nameLabelTop, // aren't clipped when they still exceed
+              width: barW * 3,           // available even after shrink to 8px
+              height: RK_LAYOUT.nameLabelHeight,
+              fontFamily: FONT,
+              fontSize: nameFontSize,
+              color: "rgba(255,255,255,0.9)",
+              letterSpacing: "-0.005em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              lineHeight: 1.1,
+              fontFeatureSettings: '"kern" 1',
+            }}
+          >
+            {entry.name}
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -471,7 +513,8 @@ const Stage: React.FC<{
   useInitials: boolean;
   timing: ReturnType<typeof computeRankingTiming>;
   geom: ReturnType<typeof computePedestalGeom>;
-}> = ({ entries, fmt, useInitials, timing, geom }) => {
+  portraitBg: "dark" | "light";
+}> = ({ entries, fmt, useInitials, timing, geom, portraitBg }) => {
   const frame = useCurrentFrame();
 
   // Sort so lowest rank (highest N) enters FIRST, top rank (#1) enters LAST.
@@ -541,6 +584,7 @@ const Stage: React.FC<{
               useInitials={useInitials}
               isWinner={entry.rank === 1}
               geom={geom}
+              portraitBg={portraitBg}
             />
           );
         })}
@@ -553,11 +597,21 @@ const Stage: React.FC<{
 
 export const RankingComposition: React.FC<RankingProps> = (props) => {
   const {
-    ranking,
+    ranking: rankingProp,
+    slug,
     titleOverride,
     topN = RK_DEFAULT_TOP_N,
     useInitials = false,
   } = props;
+
+  // Slug wins if provided and matches a registered ranking (CLI convenience).
+  const ranking = React.useMemo<Ranking>(() => {
+    if (slug) {
+      const found = RANKINGS.find((r) => r.slug === slug);
+      if (found) return found;
+    }
+    return rankingProp;
+  }, [slug, rankingProp]);
 
   // Title source: manual override wins; otherwise auto-swap "Top N" from the
   // ranking's declared title to match the current `topN` prop.
@@ -605,11 +659,16 @@ export const RankingComposition: React.FC<RankingProps> = (props) => {
 
       <TitleBar title={title} />
 
-      <Stage entries={entries} fmt={ranking.format} useInitials={useInitials} timing={timing} geom={geom} />
+      <Stage
+        entries={entries}
+        fmt={ranking.format}
+        useInitials={useInitials}
+        timing={timing}
+        geom={geom}
+        portraitBg={ranking.portraitBg ?? "dark"}
+      />
 
-      <Sequence from={timing.ctaStartF}>
-        <Cta />
-      </Sequence>
+      {/* CTA card intentionally removed — video ends on the settled winner. */}
 
       <CornerLogo />
     </AbsoluteFill>

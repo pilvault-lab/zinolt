@@ -23,6 +23,12 @@ export type RankingEntry = {
    */
   color?: string;
   /**
+   * Per-entry override for the portrait-circle background. Falls back to
+   * the ranking-level `portraitBg` when unset. Use "light" for entries whose
+   * logo/image is dark and would disappear on the default dark circle.
+   */
+  portraitBg?: "dark" | "light";
+  /**
    * Optional per-entry notes (source, caveats). Not rendered.
    * Use this to record where the value came from + confidence.
    */
@@ -38,13 +44,16 @@ export type Ranking = {
   metricLabel: string;
   /**
    * Value formatter: choose a canonical format applied by the composition.
-   *   "usd-b"  → "$XXXB"           (e.g. $760B)
-   *   "usd-m"  → "$XXXM"
-   *   "usd"    → "$X,XXX,XXX"
+   *   "usd-t"  → "$X.XT"           (1 decimal — for trillions)
+   *   "usd-b"  → "$XXXB"           (integer)
+   *   "usd-b1" → "$X.XB"           (1 decimal — movies at $2.9B vs $2.7B)
+   *   "usd-m"  → "$XXXM"           (integer)
+   *   "usd"    → "$X,XXX,XXX"      (integer)
+   *   "num-b"  → "X.XB"            (1 decimal, no $ — counts like downloads)
    *   "int"    → "12,345"
-   *   "pct"    → "12.3%"
+   *   "pct"    → "12%"
    */
-  format: "usd-b" | "usd-m" | "usd" | "int" | "pct";
+  format: "usd-t" | "usd-b" | "usd-b1" | "usd-m" | "usd" | "num-b" | "int" | "pct";
   /** Human-readable "as of" date, e.g. "August 2026". Rendered on title card. */
   asOfDate: string;
   /**
@@ -56,6 +65,15 @@ export type Ranking = {
    * Source URL(s) for auditor traceability. Not rendered.
    */
   sources?: string[];
+  /**
+   * Portrait-circle background for all entries in this ranking. Use "light"
+   * when logos/images are dark and would disappear on a dark circle
+   * (typical for company logos: Meta, Amazon, Apple). Use "dark" (default)
+   * for people-portrait rankings.
+   *
+   * Per-entry `portraitBg` overrides this.
+   */
+  portraitBg?: "dark" | "light";
   /**
    * Ordered #1 through #N. The composition sorts by `rank` so order in
    * the array doesn't matter, but keeping them in rank order is nicer to read.
