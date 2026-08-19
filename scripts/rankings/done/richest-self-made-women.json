@@ -1,0 +1,24 @@
+{
+  "slug": "richest-self-made-women",
+  "title": "Top 10 Richest Self-Made Women",
+  "metricLabel": "net worth",
+  "format": "usd-b",
+  "asOfDate": "Forbes 2024",
+  "portraitBg": "dark",
+  "sources": [
+    "https://www.forbes.com/self-made-women/"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Diane Hendricks",      "value": 22,  "wikiTitle": "Diane_Hendricks",      "note": "ABC Supply" },
+    { "rank": 2,  "name": "Judy Faulkner",        "value": 8,   "wikiTitle": "Judith_R._Faulkner",   "note": "Epic Systems" },
+    { "rank": 3,  "name": "Marian Ilitch",        "value": 4.6, "wikiTitle": "Marian_Ilitch",        "note": "Little Caesars — with late husband" },
+    { "rank": 4,  "name": "Judy Love",            "value": 3.5, "wikiTitle": "Judy_Love",            "note": "Love's Travel Stops" },
+    { "rank": 5,  "name": "Oprah Winfrey",        "value": 3.0, "wikiTitle": "Oprah_Winfrey",        "note": "media / OWN" },
+    { "rank": 6,  "name": "Meg Whitman",          "value": 3.0, "wikiTitle": "Meg_Whitman",          "note": "eBay / HPE" },
+    { "rank": 7,  "name": "Kim Kardashian",       "value": 1.7, "wikiTitle": "Kim_Kardashian",       "note": "SKIMS" },
+    { "rank": 8,  "name": "Rihanna",              "value": 1.4, "wikiTitle": "Rihanna",              "note": "Fenty Beauty" },
+    { "rank": 9,  "name": "Sara Blakely",         "value": 1.1, "wikiTitle": "Sara_Blakely",         "note": "Spanx" },
+    { "rank": 10, "name": "Whitney Wolfe Herd",   "value": 0.9, "wikiTitle": "Whitney_Wolfe_Herd",   "note": "Bumble — down from peak" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "slug": "highest-paid-ceos-2026",
+  "title": "Top 10 Highest-Paid CEOs",
+  "metricLabel": "annual pay",
+  "format": "usd-m",
+  "asOfDate": "2024 reporting",
+  "portraitBg": "dark",
+  "sources": [
+    "https://aflcio.org/paywatch",
+    "https://www.equilar.com/reports/100-highest-paid-ceos.html"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Alex Karp",       "value": 1098, "wikiTitle": "Alex_Karp",       "note": "Palantir — mega equity grant" },
+    { "rank": 2,  "name": "Sundar Pichai",   "value": 226,  "wikiTitle": "Sundar_Pichai",   "note": "Alphabet" },
+    { "rank": 3,  "name": "Hock Tan",        "value": 162,  "wikiTitle": "Hock_Tan",        "note": "Broadcom" },
+    { "rank": 4,  "name": "Nikesh Arora",    "value": 151,  "wikiTitle": "Nikesh_Arora",    "note": "Palo Alto Networks" },
+    { "rank": 5,  "name": "Satya Nadella",   "value": 79,   "wikiTitle": "Satya_Nadella",   "note": "Microsoft" },
+    { "rank": 6,  "name": "Tim Cook",        "value": 63,   "wikiTitle": "Tim_Cook",        "note": "Apple" },
+    { "rank": 7,  "name": "Ted Sarandos",    "value": 50,   "wikiTitle": "Ted_Sarandos",    "note": "Netflix" },
+    { "rank": 8,  "name": "Jamie Dimon",     "value": 36,   "wikiTitle": "Jamie_Dimon",     "note": "JPMorgan Chase" },
+    { "rank": 9,  "name": "Andy Jassy",      "value": 29,   "wikiTitle": "Andy_Jassy",      "note": "Amazon" },
+    { "rank": 10, "name": "Mark Zuckerberg", "value": 27,   "wikiTitle": "Mark_Zuckerberg", "note": "Meta — largely security" }
+  ]
+}

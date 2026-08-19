@@ -1,0 +1,25 @@
+{
+  "slug": "largest-ipos-history",
+  "title": "Top 10 Largest IPOs in History",
+  "metricLabel": "capital raised",
+  "format": "usd-b1",
+  "asOfDate": "through 2024",
+  "portraitBg": "light",
+  "sources": [
+    "Exchange data",
+    "https://en.wikipedia.org/wiki/List_of_largest_initial_public_offerings"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Saudi Aramco",             "value": 29.4, "wikiTitle": "Saudi_Aramco", "wikiFile": "Saudi aramco logo.svg", "note": "2019" },
+    { "rank": 2,  "name": "Alibaba",                  "value": 25.0, "wikiTitle": "Alibaba_Group",                "note": "2014" },
+    { "rank": 3,  "name": "SoftBank Corp",            "value": 23.5, "wikiTitle": "SoftBank_Corp.",               "note": "2018" },
+    { "rank": 4,  "name": "Agricultural Bank of China","value": 22.1,"wikiTitle": "Agricultural_Bank_of_China",   "note": "2010" },
+    { "rank": 5,  "name": "NTT DoCoMo",               "value": 18.4, "wikiTitle": "NTT_Docomo",                   "note": "1998" },
+    { "rank": 6,  "name": "Visa",                     "value": 17.9, "wikiTitle": "Visa_Inc.",                    "note": "2008" },
+    { "rank": 7,  "name": "AIA Group",                "value": 17.8, "wikiTitle": "AIA_Group",                    "note": "2010" },
+    { "rank": 8,  "name": "Enel",                     "value": 17.4, "wikiTitle": "Enel",                         "note": "1999" },
+    { "rank": 9,  "name": "Facebook",                 "value": 16.0, "wikiTitle": "Initial_public_offering_of_Facebook","wikiFile": "Facebook f logo (2019).svg", "note": "2012" },
+    { "rank": 10, "name": "General Motors",           "value": 15.8, "wikiTitle": "General_Motors",               "note": "2010 re-IPO" }
+  ]
+}

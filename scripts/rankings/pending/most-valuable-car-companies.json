@@ -1,0 +1,24 @@
+{
+  "slug": "most-valuable-car-companies",
+  "title": "Top 10 Most Valuable Car Companies",
+  "metricLabel": "market cap",
+  "format": "usd-b",
+  "asOfDate": "August 2026",
+  "portraitBg": "light",
+  "sources": [
+    "https://companiesmarketcap.com/automakers/largest-automakers-by-market-cap/"
+  ],
+  "assetKind": "company",
+  "entries": [
+    { "rank": 1,  "name": "Tesla",             "value": 1100, "ticker": "TSLA" },
+    { "rank": 2,  "name": "Toyota",            "value": 290,  "ticker": "TM" },
+    { "rank": 3,  "name": "BYD",               "value": 100,  "ticker": "1211.HK", "wikiFile": "BYD Auto Logo.svg" },
+    { "rank": 4,  "name": "Ferrari",           "value": 85,   "ticker": "RACE" },
+    { "rank": 5,  "name": "BMW",               "value": 60,   "ticker": "BMW.DE" },
+    { "rank": 6,  "name": "General Motors",    "value": 60,   "ticker": "GM" },
+    { "rank": 7,  "name": "Mercedes-Benz",     "value": 55,   "ticker": "MBG.DE" },
+    { "rank": 8,  "name": "Porsche",           "value": 55,   "ticker": "P911.DE" },
+    { "rank": 9,  "name": "Volkswagen",        "value": 50,   "ticker": "VOW.DE" },
+    { "rank": 10, "name": "Stellantis",        "value": 50,   "ticker": "STLA" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "slug": "fastest-to-1b-valuation",
+  "title": "Top 10 Fastest Companies to $1B",
+  "metricLabel": "months to unicorn",
+  "format": "int",
+  "asOfDate": "historical",
+  "portraitBg": "light",
+  "sources": [
+    "CB Insights unicorn timelines",
+    "Company news archives"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Jio Platforms", "value": 5,  "wikiTitle": "Jio_Platforms",       "note": "reached $1B in months via strategic invests" },
+    { "rank": 2,  "name": "Jet.com",       "value": 6,  "wikiTitle": "Jet.com",             "note": "6 months to unicorn" },
+    { "rank": 3,  "name": "Bird",          "value": 12, "wikiTitle": "Bird_Global",         "note": "scooter startup" },
+    { "rank": 4,  "name": "Ola Cabs",      "value": 18, "wikiTitle": "Ola_Cabs",            "note": "" },
+    { "rank": 5,  "name": "Deel",          "value": 20, "wikiTitle": "Deel_(company)",      "note": "" },
+    { "rank": 6,  "name": "Roblox",        "value": 24, "wikiTitle": "Roblox_Corporation",  "note": "" },
+    { "rank": 7,  "name": "Snap",          "value": 24, "wikiTitle": "Snap_Inc.",           "wikiFile": "Snapchat-logo-svgrepo-com.svg", "note": "Snapchat parent" },
+    { "rank": 8,  "name": "Slack",         "value": 24, "wikiTitle": "Slack_Technologies",  "note": "" },
+    { "rank": 9,  "name": "Instacart",     "value": 30, "wikiTitle": "Instacart",           "note": "" },
+    { "rank": 10, "name": "Brex",          "value": 36, "wikiTitle": "Brex",                "wikiFile": "Brex logo black.svg", "note": "" }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "slug": "most-valuable-startups",
+  "title": "Top 10 Most Valuable Startups",
+  "metricLabel": "valuation",
+  "format": "usd-b",
+  "asOfDate": "2024",
+  "portraitBg": "light",
+  "sources": [
+    "https://www.cbinsights.com/research-unicorn-companies"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "SpaceX",     "value": 350, "wikiTitle": "SpaceX",             "note": "Elon Musk" },
+    { "rank": 2,  "name": "ByteDance",  "value": 220, "wikiTitle": "ByteDance",          "note": "TikTok parent" },
+    { "rank": 3,  "name": "OpenAI",     "value": 157, "wikiTitle": "OpenAI",             "wikiFile": "OpenAI Logo.svg", "note": "" },
+    { "rank": 4,  "name": "Stripe",     "value": 91,  "wikiTitle": "Stripe,_Inc.",       "note": "" },
+    { "rank": 5,  "name": "SHEIN",      "value": 66,  "wikiTitle": "Shein",              "wikiFile": "Shein Logo 2017.svg", "note": "" },
+    { "rank": 6,  "name": "Databricks", "value": 62,  "wikiTitle": "Databricks",         "note": "" },
+    { "rank": 7,  "name": "xAI",        "value": 50,  "wikiTitle": "XAI_(company)",      "wikiFile": "Logo Grok AI (xAI) 2025.png", "note": "Elon Musk" },
+    { "rank": 8,  "name": "Revolut",    "value": 45,  "wikiTitle": "Revolut",            "note": "" },
+    { "rank": 9,  "name": "Canva",      "value": 32,  "wikiTitle": "Canva",              "note": "" },
+    { "rank": 10, "name": "Fanatics",   "value": 31,  "wikiTitle": "Fanatics,_Inc.",     "note": "" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "slug": "most-valuable-sports-teams",
+  "title": "Top 10 Most Valuable Sports Teams",
+  "metricLabel": "franchise value",
+  "format": "usd-b",
+  "asOfDate": "2024",
+  "portraitBg": "light",
+  "sources": [
+    "https://www.forbes.com/sports-money/",
+    "https://www.sportico.com/valuations/"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Dallas Cowboys",       "value": 10.1, "wikiTitle": "Dallas_Cowboys",       "note": "NFL" },
+    { "rank": 2,  "name": "Golden State Warriors","value": 8.8,  "wikiTitle": "Golden_State_Warriors","note": "NBA" },
+    { "rank": 3,  "name": "Los Angeles Rams",     "value": 7.6,  "wikiTitle": "Los_Angeles_Rams",     "note": "NFL" },
+    { "rank": 4,  "name": "New York Yankees",     "value": 7.5,  "wikiTitle": "New_York_Yankees",     "note": "MLB" },
+    { "rank": 5,  "name": "New York Knicks",      "value": 7.5,  "wikiTitle": "New_York_Knicks",      "note": "NBA" },
+    { "rank": 6,  "name": "New England Patriots", "value": 7.4,  "wikiTitle": "New_England_Patriots", "note": "NFL" },
+    { "rank": 7,  "name": "Los Angeles Lakers",   "value": 7.1,  "wikiTitle": "Los_Angeles_Lakers",   "note": "NBA" },
+    { "rank": 8,  "name": "Real Madrid",          "value": 6.7,  "wikiTitle": "Real_Madrid_CF",       "note": "soccer" },
+    { "rank": 9,  "name": "Manchester United",    "value": 6.2,  "wikiTitle": "Manchester_United_F.C.","note": "soccer" },
+    { "rank": 10, "name": "FC Barcelona",         "value": 5.6,  "wikiTitle": "FC_Barcelona",         "note": "soccer" }
+  ]
+}

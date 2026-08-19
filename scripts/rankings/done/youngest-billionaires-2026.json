@@ -1,0 +1,24 @@
+{
+  "slug": "youngest-billionaires-2026",
+  "title": "Top 10 Youngest Billionaires",
+  "metricLabel": "net worth",
+  "format": "usd-b",
+  "asOfDate": "Forbes 2024",
+  "portraitBg": "dark",
+  "sources": [
+    "https://www.forbes.com/billionaires/"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Livia Voigt",           "value": 1.1, "wikiTitle": "Livia_Voigt",           "note": "age 19 — WEG heiress (Brazil)" },
+    { "rank": 2,  "name": "Clemente Del Vecchio",  "value": 4.7, "wikiTitle": "Clemente_Del_Vecchio",  "note": "age 20 — Luxottica heir" },
+    { "rank": 3,  "name": "Kim Jung-min",          "value": 1.6, "wikiTitle": "Kim_Jung-min_(entrepreneur)", "note": "age 22 — Nexon heiress" },
+    { "rank": 4,  "name": "Kim Jung-youn",         "value": 1.3, "wikiTitle": "Kim_Jung-youn",         "note": "age 22 — Nexon heiress" },
+    { "rank": 5,  "name": "Kevin David Lehmann",   "value": 3.4, "wikiTitle": "Kevin_David_Lehmann",   "note": "age 22 — dm-drogerie heir" },
+    { "rank": 6,  "name": "Wang Zelong",           "value": 1.4, "wikiTitle": "Wang_Zelong",           "note": "age 25 — chemicals heir" },
+    { "rank": 7,  "name": "Alexandr Wang",         "value": 3.0, "wikiTitle": "Alexandr_Wang",         "note": "age 27 — Scale AI, self-made" },
+    { "rank": 8,  "name": "Rémi Dassault",         "value": 1.5, "wikiTitle": "Dassault_family",       "note": "age 27 — Dassault heir" },
+    { "rank": 9,  "name": "Alexandra Andresen",    "value": 1.5, "wikiTitle": "Alexandra_Andresen",    "note": "age 28 — Ferd heiress" },
+    { "rank": 10, "name": "Katharina Andresen",    "value": 1.5, "wikiTitle": "Katharina_Andresen",    "note": "age 29 — Ferd heiress" }
+  ]
+}

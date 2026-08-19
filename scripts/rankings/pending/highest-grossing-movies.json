@@ -1,0 +1,24 @@
+{
+  "slug": "highest-grossing-movies",
+  "title": "Top 10 Highest-Grossing Movies",
+  "metricLabel": "worldwide box office",
+  "format": "usd-b1",
+  "asOfDate": "through 2024",
+  "portraitBg": "dark",
+  "sources": [
+    "https://www.boxofficemojo.com/chart/ww_top_lifetime_gross/"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Avatar",                       "value": 2.92, "wikiTitle": "Avatar_(2009_film)",             "note": "2009" },
+    { "rank": 2,  "name": "Avengers: Endgame",            "value": 2.80, "wikiTitle": "Avengers:_Endgame",              "note": "2019" },
+    { "rank": 3,  "name": "Avatar: The Way of Water",     "value": 2.32, "wikiTitle": "Avatar:_The_Way_of_Water",       "note": "2022" },
+    { "rank": 4,  "name": "Titanic",                      "value": 2.26, "wikiTitle": "Titanic_(1997_film)",            "note": "1997" },
+    { "rank": 5,  "name": "Star Wars: The Force Awakens", "value": 2.07, "wikiTitle": "Star_Wars:_The_Force_Awakens",   "note": "2015" },
+    { "rank": 6,  "name": "Avengers: Infinity War",       "value": 2.05, "wikiTitle": "Avengers:_Infinity_War",         "note": "2018" },
+    { "rank": 7,  "name": "Spider-Man: No Way Home",      "value": 1.92, "wikiTitle": "Spider-Man:_No_Way_Home",        "note": "2021" },
+    { "rank": 8,  "name": "Inside Out 2",                 "value": 1.70, "wikiTitle": "Inside_Out_2",                   "note": "2024" },
+    { "rank": 9,  "name": "Jurassic World",               "value": 1.67, "wikiTitle": "Jurassic_World",                 "note": "2015" },
+    { "rank": 10, "name": "The Lion King",                "value": 1.66, "wikiTitle": "The_Lion_King_(2019_film)",      "note": "2019 remake" }
+  ]
+}

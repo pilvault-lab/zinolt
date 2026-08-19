@@ -1,0 +1,25 @@
+{
+  "slug": "most-profitable-companies-2026",
+  "title": "Top 10 Most Profitable Companies",
+  "metricLabel": "annual profit",
+  "format": "usd-b",
+  "asOfDate": "latest fiscal year",
+  "portraitBg": "light",
+  "sources": [
+    "https://fortune.com/global500/",
+    "Company 10-K filings"
+  ],
+  "assetKind": "company",
+  "entries": [
+    { "rank": 1,  "name": "Saudi Aramco",       "value": 106, "ticker": "2222.SR" },
+    { "rank": 2,  "name": "Apple",              "value": 97,  "ticker": "AAPL" },
+    { "rank": 3,  "name": "Berkshire Hathaway", "value": 96,  "ticker": "BRK-A" },
+    { "rank": 4,  "name": "Microsoft",          "value": 88,  "ticker": "MSFT" },
+    { "rank": 5,  "name": "Alphabet",           "value": 74,  "ticker": "GOOG" },
+    { "rank": 6,  "name": "Meta",               "value": 62,  "ticker": "META" },
+    { "rank": 7,  "name": "ICBC",               "value": 51,  "ticker": "1398.HK" },
+    { "rank": 8,  "name": "JPMorgan Chase",     "value": 50,  "ticker": "JPM" },
+    { "rank": 9,  "name": "ExxonMobil",         "value": 36,  "ticker": "XOM" },
+    { "rank": 10, "name": "Amazon",             "value": 30,  "ticker": "AMZN" }
+  ]
+}

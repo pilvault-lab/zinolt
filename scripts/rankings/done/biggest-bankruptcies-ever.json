@@ -1,0 +1,25 @@
+{
+  "slug": "biggest-bankruptcies-ever",
+  "title": "Top 10 Biggest Company Bankruptcies Ever",
+  "metricLabel": "assets at filing",
+  "format": "usd-b",
+  "asOfDate": "historical",
+  "portraitBg": "light",
+  "sources": [
+    "https://www.bankruptcydata.com/",
+    "https://en.wikipedia.org/wiki/List_of_largest_bankruptcies_in_US_history"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Lehman Brothers",       "value": 691, "wikiTitle": "Lehman_Brothers",       "note": "2008 — trigger of the GFC" },
+    { "rank": 2,  "name": "Washington Mutual",     "value": 328, "wikiTitle": "Washington_Mutual",     "note": "2008" },
+    { "rank": 3,  "name": "First Republic Bank",   "value": 229, "wikiTitle": "First_Republic_Bank",   "note": "2023" },
+    { "rank": 4,  "name": "Silicon Valley Bank",   "value": 209, "wikiTitle": "Silicon_Valley_Bank",   "note": "2023" },
+    { "rank": 5,  "name": "Signature Bank",        "value": 110, "wikiTitle": "Signature_Bank",        "note": "2023" },
+    { "rank": 6,  "name": "WorldCom",              "value": 104, "wikiTitle": "WorldCom",              "note": "2002 — accounting fraud" },
+    { "rank": 7,  "name": "General Motors",        "value": 91,  "wikiTitle": "General_Motors",        "note": "2009" },
+    { "rank": 8,  "name": "CIT Group",             "value": 71,  "wikiTitle": "CIT_Group",             "note": "2009" },
+    { "rank": 9,  "name": "Enron",                 "value": 66,  "wikiTitle": "Enron",                 "note": "2001 — accounting fraud" },
+    { "rank": 10, "name": "Conseco",               "value": 61,  "wikiTitle": "Conseco",               "note": "2002" }
+  ]
+}

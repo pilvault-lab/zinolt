@@ -1,0 +1,24 @@
+{
+  "slug": "most-valuable-brands-2026",
+  "title": "Top 10 Most Valuable Brands",
+  "metricLabel": "brand value",
+  "format": "usd-b",
+  "asOfDate": "2025 rankings",
+  "portraitBg": "light",
+  "sources": [
+    "https://interbrand.com/best-global-brands/"
+  ],
+  "assetKind": "brand",
+  "entries": [
+    { "rank": 1,  "name": "Apple",         "value": 488, "ticker": "AAPL" },
+    { "rank": 2,  "name": "Microsoft",     "value": 353, "ticker": "MSFT" },
+    { "rank": 3,  "name": "Amazon",        "value": 298, "ticker": "AMZN" },
+    { "rank": 4,  "name": "Google",        "value": 292, "ticker": "GOOG" },
+    { "rank": 5,  "name": "Samsung",       "value": 100, "ticker": "005930.KS" },
+    { "rank": 6,  "name": "Toyota",        "value": 68,  "ticker": "TM" },
+    { "rank": 7,  "name": "Coca-Cola",     "value": 61,  "ticker": "KO" },
+    { "rank": 8,  "name": "Mercedes-Benz", "value": 60,  "ticker": "MBG.DE" },
+    { "rank": 9,  "name": "McDonald's",    "value": 53,  "ticker": "MCD" },
+    { "rank": 10, "name": "BMW",           "value": 51,  "ticker": "BMW.DE" }
+  ]
+}

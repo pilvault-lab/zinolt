@@ -1,0 +1,25 @@
+{
+  "slug": "biggest-tech-acquisitions",
+  "title": "Top 10 Biggest Tech Acquisitions Ever",
+  "metricLabel": "deal size",
+  "format": "usd-b",
+  "asOfDate": "through 2024",
+  "portraitBg": "light",
+  "sources": [
+    "Company filings",
+    "https://en.wikipedia.org/wiki/List_of_largest_mergers_and_acquisitions"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Activision Blizzard", "value": 75.4, "wikiTitle": "Activision_Blizzard", "note": "Microsoft, 2023" },
+    { "rank": 2,  "name": "VMware",              "value": 69,   "wikiTitle": "VMware",              "note": "Broadcom, 2023" },
+    { "rank": 3,  "name": "EMC",                 "value": 67,   "wikiTitle": "Dell_EMC",            "note": "Dell, 2016" },
+    { "rank": 4,  "name": "Twitter",             "value": 44,   "wikiTitle": "Twitter,_Inc.",       "note": "Elon Musk, 2022" },
+    { "rank": 5,  "name": "Red Hat",             "value": 34,   "wikiTitle": "Red_Hat",             "note": "IBM, 2019" },
+    { "rank": 6,  "name": "Splunk",              "value": 28,   "wikiTitle": "Splunk",              "note": "Cisco, 2024" },
+    { "rank": 7,  "name": "Slack",               "value": 27.7, "wikiTitle": "Slack_(software)",    "wikiFile": "Slack Technologies Logo.svg", "note": "Salesforce, 2021" },
+    { "rank": 8,  "name": "LinkedIn",            "value": 26.2, "wikiTitle": "LinkedIn",            "wikiFile": "LinkedIn Logo 2013 (2).svg",  "note": "Microsoft, 2016" },
+    { "rank": 9,  "name": "Compaq",              "value": 25,   "wikiTitle": "Compaq",              "note": "HP, 2002" },
+    { "rank": 10, "name": "Nuance",              "value": 19.7, "wikiTitle": "Nuance_Communications","wikiFile": "Nuance Communications logo 2018.svg", "note": "Microsoft, 2022" }
+  ]
+}

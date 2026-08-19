@@ -1,0 +1,25 @@
+{
+  "slug": "most-downloaded-apps-alltime",
+  "title": "Top 10 Most Downloaded Apps of All Time",
+  "metricLabel": "downloads",
+  "format": "num-b",
+  "asOfDate": "cumulative through 2024",
+  "portraitBg": "light",
+  "sources": [
+    "https://www.data.ai/",
+    "https://sensortower.com/"
+  ],
+  "assetKind": "person",
+  "entries": [
+    { "rank": 1,  "name": "Facebook",   "value": 6.0, "wikiFile": "Facebook f logo (2019).svg", "note": "Meta" },
+    { "rank": 2,  "name": "WhatsApp",   "value": 5.8, "wikiFile": "WhatsApp Logo green.svg",     "note": "Meta" },
+    { "rank": 3,  "name": "Instagram",  "value": 5.3, "wikiFile": "Instagram logo 2022.svg",     "note": "Meta" },
+    { "rank": 4,  "name": "Messenger",  "value": 5.2, "wikiFile": "Facebook Messenger logo 2020.svg", "note": "Meta" },
+    { "rank": 5,  "name": "TikTok",     "value": 4.7, "wikiFile": "Tiktok icon.svg",                    "note": "ByteDance — excl. Douyin" },
+    { "rank": 6,  "name": "YouTube",    "value": 3.0, "wikiFile": "YouTube full-color icon (2024).svg", "note": "Alphabet" },
+    { "rank": 7,  "name": "Snapchat",   "value": 2.5, "wikiTitle": "Snapchat",                   "wikiFile": "Snapchat-logo-svgrepo-com.svg", "note": "Snap Inc" },
+    { "rank": 8,  "name": "Twitter",    "value": 2.3, "wikiFile": "Logo of Twitter.svg",         "note": "now X" },
+    { "rank": 9,  "name": "Zoom",       "value": 1.5, "wikiFile": "Zoom Communications Logo.svg","note": "pandemic surge" },
+    { "rank": 10, "name": "Telegram",   "value": 1.5, "wikiTitle": "Telegram_(software)",        "note": "" }
+  ]
+}
