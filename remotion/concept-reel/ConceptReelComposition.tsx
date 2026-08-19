@@ -29,7 +29,7 @@ export const CR_TAIL_PADDING_SEC = 2.0;
 
 export type ConceptReelWord = { text: string; start: number; end: number };
 export type ConceptReelMode = "text" | "diagram";
-export type ConceptReelBgKey = "none" | "bg-1" | "bg-2" | "bg-3" | "bg-4" | "bg-5";
+export type ConceptReelBgKey = "none" | "bg-1" | "bg-2" | "bg-3" | "bg-4" | "bg-5" | "bg-6";
 
 export const CR_BG_OPTIONS: {
   id: ConceptReelBgKey;
@@ -42,6 +42,7 @@ export const CR_BG_OPTIONS: {
   { id: "bg-3", label: "BG 3", file: "concept-reel/bg/bg-3.mp4" },
   { id: "bg-4", label: "BG 4", file: "concept-reel/bg/bg-4.mp4" },
   { id: "bg-5", label: "BG 5", file: "concept-reel/bg/bg-5.mp4" },
+  { id: "bg-6", label: "BG 6", file: "concept-reel/bg/bg-6.mp4" },
 ];
 
 export const CR_BG_FILE: Record<ConceptReelBgKey, string | null> = {
@@ -51,6 +52,7 @@ export const CR_BG_FILE: Record<ConceptReelBgKey, string | null> = {
   "bg-3": "concept-reel/bg/bg-3.mp4",
   "bg-4": "concept-reel/bg/bg-4.mp4",
   "bg-5": "concept-reel/bg/bg-5.mp4",
+  "bg-6": "concept-reel/bg/bg-6.mp4",
 };
 
 export type ConceptReelProps = {
