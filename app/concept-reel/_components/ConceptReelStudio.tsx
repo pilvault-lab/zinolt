@@ -16,9 +16,11 @@ import {
   CR_EXPORT_FPS_FULL,
   CR_WIDTH,
   CR_HEIGHT,
+  CR_BG_OPTIONS,
   type ConceptReelProps,
   type ConceptReelWord,
   type ConceptReelMode,
+  type ConceptReelBgKey,
 } from "@/remotion/concept-reel/ConceptReelComposition";
 import { CONCEPTS } from "@/lib/explainer/concepts";
 
@@ -56,6 +58,9 @@ export const ConceptReelStudio: React.FC = () => {
   const [voice, setVoice] = useState<string>(DEFAULT_VOICE);
   const [mode, setMode] = useState<ConceptReelMode>("text");
   const [diagramId, setDiagramId] = useState<string>("");
+  const [bgKey, setBgKey] = useState<ConceptReelBgKey>(
+    (conceptReelDefaultProps.bgKey ?? "bg-1") as ConceptReelBgKey,
+  );
 
   const [narration, setNarration] = useState<NarrationState>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -171,6 +176,8 @@ export const ConceptReelStudio: React.FC = () => {
     audioSrc: narration?.audioSrc ?? "",
     mode,
     diagramId,
+    bgKey,
+    forRender: false,
   };
 
   const durationFrames = computeConceptReelDurationFrames(
@@ -210,7 +217,7 @@ export const ConceptReelStudio: React.FC = () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        inputProps: currentProps as any,
+        inputProps: { ...currentProps, forRender: true } as any,
         licenseKey: "free-license",
         videoCodec: "h264",
         // 6 Mbps is plenty for 1080p text + chart video — halves file size
@@ -358,6 +365,79 @@ export const ConceptReelStudio: React.FC = () => {
                 </select>
               </div>
             )}
+          </div>
+
+          {/* Background */}
+          <div className="flex flex-col gap-3">
+            <span
+              className="font-sans text-xs uppercase tracking-wide"
+              style={{ color: BRAND.colors.grey500 }}
+            >
+              Background
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {CR_BG_OPTIONS.map((opt) => {
+                const active = bgKey === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setBgKey(opt.id)}
+                    className="relative overflow-hidden rounded-md border"
+                    style={{
+                      aspectRatio: "9 / 16",
+                      borderColor: active ? BRAND.colors.ink : BRAND.colors.grey200,
+                      borderWidth: active ? 2 : 1,
+                      backgroundColor: "#000",
+                    }}
+                    title={opt.label}
+                  >
+                    {opt.file ? (
+                      // eslint-disable-next-line jsx-a11y/media-has-caption
+                      <video
+                        src={`/${opt.file}`}
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: "#0A0A0A",
+                          color: "rgba(255,255,255,0.5)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                          letterSpacing: 2,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        None
+                      </div>
+                    )}
+                    <span
+                      className="absolute bottom-1 left-1 rounded px-1.5 py-0.5 font-sans text-[10px]"
+                      style={{
+                        background: "rgba(0,0,0,0.65)",
+                        color: "#fff",
+                      }}
+                    >
+                      {opt.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Voice */}

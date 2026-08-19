@@ -2,11 +2,12 @@ import React from "react";
 import {
   AbsoluteFill,
   interpolate,
+  OffthreadVideo,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { Audio as MediaAudio } from "@remotion/media";
+import { Audio as MediaAudio, Video as MediaVideo } from "@remotion/media";
 import { Explainer } from "./Explainer";
 import { getConcept } from "@/lib/explainer/concepts";
 
@@ -28,6 +29,27 @@ export const CR_TAIL_PADDING_SEC = 2.0;
 
 export type ConceptReelWord = { text: string; start: number; end: number };
 export type ConceptReelMode = "text" | "diagram";
+export type ConceptReelBgKey = "none" | "bg-1" | "bg-2" | "bg-3" | "bg-4";
+
+export const CR_BG_OPTIONS: {
+  id: ConceptReelBgKey;
+  label: string;
+  file: string | null;
+}[] = [
+  { id: "none", label: "None (black)", file: null },
+  { id: "bg-1", label: "BG 1", file: "concept-reel/bg/bg-1.mp4" },
+  { id: "bg-2", label: "BG 2", file: "concept-reel/bg/bg-2.mp4" },
+  { id: "bg-3", label: "BG 3", file: "concept-reel/bg/bg-3.mp4" },
+  { id: "bg-4", label: "BG 4", file: "concept-reel/bg/bg-4.mp4" },
+];
+
+export const CR_BG_FILE: Record<ConceptReelBgKey, string | null> = {
+  "none": null,
+  "bg-1": "concept-reel/bg/bg-1.mp4",
+  "bg-2": "concept-reel/bg/bg-2.mp4",
+  "bg-3": "concept-reel/bg/bg-3.mp4",
+  "bg-4": "concept-reel/bg/bg-4.mp4",
+};
 
 export type ConceptReelProps = {
   /** Full concept text (used for fallback display and grouping). */
@@ -44,6 +66,10 @@ export type ConceptReelProps = {
   diagramId?: string;
   /** Optional fps override — CLI passes this to render at a different rate than CR_FPS. */
   fpsOverride?: number;
+  /** Background: "none" = flat black, or one of the bg-N loops from public/concept-reel/bg/. */
+  bgKey?: ConceptReelBgKey;
+  /** true when we're doing a browser MP4 render — swap OffthreadVideo for @remotion/media <Video>. */
+  forRender?: boolean;
 };
 
 export const conceptReelDefaultProps: ConceptReelProps = {
@@ -52,6 +78,8 @@ export const conceptReelDefaultProps: ConceptReelProps = {
   audioSrc: "",
   mode: "text",
   diagramId: "",
+  bgKey: "bg-1",
+  forRender: false,
 };
 
 /* ─── Font loading ───────────────────────────────────────────────────────── */
@@ -114,17 +142,25 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
   audioSrc,
   mode,
   diagramId,
+  bgKey = "bg-1",
+  forRender = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const tSec = frame / fps;
 
   const totalDurSec = durationInFrames / fps;
+  const bgFile = CR_BG_FILE[bgKey];
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0A0A0A" }}>
       {audioSrc ? (
         <MediaAudio src={audioSrc.startsWith("data:") || audioSrc.startsWith("http") ? audioSrc : staticFile(audioSrc)} />
+      ) : null}
+
+      {/* Background loop — object-fit: cover, muted, plus a dark scrim so text stays legible. */}
+      {bgFile ? (
+        <BackgroundVideo file={bgFile} forRender={forRender} />
       ) : null}
 
       {/* Faint moving glow — subtle life, no distraction */}
@@ -136,6 +172,38 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
         <DiagramBody diagramId={diagramId ?? ""} words={words} tSec={tSec} />
       )}
     </AbsoluteFill>
+  );
+};
+
+/* ─── Background loop ────────────────────────────────────────────────────── */
+const BackgroundVideo: React.FC<{ file: string; forRender: boolean }> = ({
+  file,
+  forRender,
+}) => {
+  const src = staticFile(file);
+  const style: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  };
+  return (
+    <>
+      {forRender ? (
+        <MediaVideo src={src} muted volume={0} style={style} />
+      ) : (
+        <OffthreadVideo src={src} muted volume={0} style={style} />
+      )}
+      {/* Dark scrim keeps karaoke text high-contrast on top of any bg. */}
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.55) 100%)",
+          pointerEvents: "none",
+        }}
+      />
+    </>
   );
 };
 
