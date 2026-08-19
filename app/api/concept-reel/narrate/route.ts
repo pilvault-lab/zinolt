@@ -60,18 +60,22 @@ export async function POST(req: Request) {
       voice,
       rate: "-5%",
     });
-    // Upload to Blob and return a URL instead of base64-inlining. Base64 in
-    // JSON killed mobile at ~1 MB+ (JSON.parse stalled the main thread, huge
-    // data URLs OOMed the <audio> element). URL streams natively.
+    // Upload to Blob and return a proxy URL instead of base64-inlining. Base64
+    // in JSON killed mobile at ~1 MB+ (JSON.parse stalled the main thread,
+    // huge data URLs OOMed the <audio> element).
+    //
+    // Store is private, so we can't hand out the raw blob URL — we return a
+    // path to /api/concept-reel/narration that streams the mp3 through with
+    // the token server-side. Client uses this as <audio src>.
     const key = `concept-reel/narrations/${Date.now()}-${randomBytes(4).toString("hex")}.mp3`;
-    const blob = await put(key, mp3, {
-      access: "public",
+    await put(key, mp3, {
+      access: "private",
       contentType: "audio/mpeg",
       addRandomSuffix: false,
       cacheControlMaxAge: 60 * 60 * 24 * 7,
     });
     return NextResponse.json({
-      audioUrl: blob.url,
+      audioUrl: `/api/concept-reel/narration?p=${encodeURIComponent(key)}`,
       words,
       durationSec,
       voice,
