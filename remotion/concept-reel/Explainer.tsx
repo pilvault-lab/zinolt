@@ -6,6 +6,8 @@ import type {
   ConceptScript,
   Candle,
   ChartPoint,
+  Easing,
+  FracPoint,
 } from "@/lib/explainer/types";
 import type { ConceptReelWord } from "./ConceptReelComposition";
 
@@ -45,6 +47,39 @@ const ZONE_STROKE = "rgba(255,255,255,0.65)";
 const MARKER_COLOR = "#FFFFFF";
 
 type XY = { x: number; y: number };
+
+/* ─── Easing curves ─────────────────────────────────────────────────────────
+ * AE-grade motion. Feed raw 0..1 progress in, get eased 0..1 out.
+ * Default across the reel is `outExpo` — fast in, gentle settle.
+ * ------------------------------------------------------------------------ */
+function ease(p: number, kind: Easing = "outExpo"): number {
+  const t = Math.min(1, Math.max(0, p));
+  switch (kind) {
+    case "linear":
+      return t;
+    case "outExpo":
+      return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    case "outQuint":
+      return 1 - Math.pow(1 - t, 5);
+    case "outBack": {
+      const c1 = 1.70158;
+      const c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+    case "inCubic":
+      return t * t * t;
+    case "inOutQuart":
+      return t < 0.5
+        ? 8 * t * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 4) / 2;
+  }
+}
+
+/** Convert a fractional-space anchor to composition pixels. */
+function fracToXY(f: FracPoint | undefined, dflt: FracPoint): XY {
+  const p = f ?? dflt;
+  return { x: p.x * COMP_W, y: p.y * COMP_H };
+}
 
 class Projector {
   constructor(private cfg: ChartConfig) {}
@@ -105,6 +140,7 @@ export const Explainer: React.FC<{
   const annotationBeats: Array<{
     beat: Extract<Beat, { op: "annotation" }>;
     progress: number;
+    exit: number;
   }> = [];
 
   for (let i = 0; i < beats.length; i++) {
@@ -113,25 +149,45 @@ export const Explainer: React.FC<{
     const dur = beat.animDurationSec ?? 0.5;
     if (tSec < start) continue;
     if (beat.op === "pulse") continue; // applied below
+    if (beat.op === "sfx") continue;   // audio-only, handled by composition
 
     const rawProgress = (tSec - start) / dur;
-    const progress = Math.min(1, Math.max(0, rawProgress));
+    const progress = ease(Math.min(1, Math.max(0, rawProgress)), beat.easing);
+
+    // Optional fade-out driven by `until` word index. `exit` climbs from 0→1
+    // over the same animDurationSec once `tSec` passes the exit time. We use
+    // it as an opacity multiplier at render time.
+    let exit = 0;
+    if (typeof beat.until === "number") {
+      const exitStart = wordTime(words, beat.until);
+      if (tSec >= exitStart) {
+        const exitDur = beat.exitDurationSec ?? 0.15;
+        exit = ease(
+          Math.min(1, Math.max(0, (tSec - exitStart) / exitDur)),
+          "inCubic",
+        );
+      }
+      if (exit >= 1) continue; // fully faded out, skip render
+    }
+
     if (beat.op === "annotation") {
-      annotationBeats.push({ beat, progress });
+      annotationBeats.push({ beat, progress, exit });
       continue;
     }
     const prim = renderPrimitive(beat, proj, progress);
     if (!prim) continue;
-    primitives.push(prim);
+    if (exit > 0) primitives.push(wrapExit(prim, exit));
+    else primitives.push(prim);
     if (prim.id) primById.set(prim.id, prim);
   }
 
   // Resolve annotations against already-added primitives.
   const annotationPrims: Primitive[] = [];
-  for (const { beat, progress } of annotationBeats) {
+  for (const { beat, progress, exit } of annotationBeats) {
     const target = primById.get(beat.target);
     if (!target) continue;
-    annotationPrims.push(renderAnnotation(beat, target, progress));
+    const prim = renderAnnotation(beat, target, progress);
+    annotationPrims.push(exit > 0 ? wrapExit(prim, exit) : prim);
   }
 
   // Compute active pulses per primitive.
@@ -159,7 +215,9 @@ export const Explainer: React.FC<{
       textRendering="geometricPrecision"
       style={{ position: "absolute", left: 0, top: 0 }}
     >
-      {script.chart && proj ? <ChartFrame cfg={script.chart} proj={proj} /> : null}
+      {script.chart && proj && script.layout !== "infographic" ? (
+        <ChartFrame cfg={script.chart} proj={proj} />
+      ) : null}
 
       {primitives.map((p, idx) => {
         const pulse = pulseByTarget.get(p.id) ?? 0;
@@ -358,9 +416,283 @@ function renderPrimitive(
     case "bracket":
       if (!proj) return null;
       return renderBracket(beat, proj, progress);
+    case "hookText":
+      return renderHookText(beat, progress);
+    case "symbolCard":
+      return renderSymbolCard(beat, progress);
+    case "row":
+      return renderRow(beat, progress);
     default:
       return null;
   }
+}
+
+/** Wrap a primitive's render with an outer opacity to drive `until` fade-out. */
+function wrapExit(prim: Primitive, exit: number): Primitive {
+  const remaining = 1 - exit;
+  return {
+    ...prim,
+    render: (opts) => (
+      <g opacity={remaining}>{prim.render(opts)}</g>
+    ),
+  };
+}
+
+/* ─── Infographic renderers ─────────────────────────────────────────────── */
+
+function renderHookText(
+  beat: Extract<Beat, { op: "hookText" }>,
+  progress: number,
+): Primitive {
+  const at = fracToXY(beat.at, { x: 0.5, y: 0.45 });
+  const size = beat.size ?? "hero";
+  const fontSize = size === "hero" ? 96 : size === "title" ? 68 : 40;
+  const weight = size === "hero" ? 700 : size === "title" ? 600 : 500;
+  const letterSpacing = size === "hero" ? -2 : -1;
+
+  // Rise + subtle scale drift on hold so nothing sits static.
+  const rise = (1 - progress) * 22;
+  const holdDrift = 1 + (progress > 0.9 ? (progress - 0.9) * 0.02 : 0);
+
+  return {
+    id: beat.id ?? "",
+    center: at,
+    render: () => (
+      <g
+        opacity={progress}
+        transform={`translate(${at.x} ${at.y + rise}) scale(${holdDrift})`}
+      >
+        <text
+          x={0}
+          y={fontSize * 0.35}
+          textAnchor="middle"
+          fill={TEXT_COLOR}
+          fontFamily="'Messina Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          fontSize={fontSize}
+          fontWeight={weight}
+          letterSpacing={letterSpacing}
+        >
+          {beat.text}
+        </text>
+      </g>
+    ),
+  };
+}
+
+function renderSymbolCard(
+  beat: Extract<Beat, { op: "symbolCard" }>,
+  progress: number,
+): Primitive {
+  return renderSymbolCardAt(
+    beat.symbol,
+    beat.subtitle,
+    fracToXY(beat.at, { x: 0.5, y: 0.5 }),
+    beat.size ?? "hero",
+    beat.letterStagger !== false,
+    progress,
+    beat.id,
+  );
+}
+
+function renderSymbolCardAt(
+  symbol: string,
+  subtitle: string | undefined,
+  center: XY,
+  size: "hero" | "medium" | "small",
+  letterStagger: boolean,
+  progress: number,
+  id: string | undefined,
+): Primitive {
+  const symbolSize =
+    size === "hero" ? 200 : size === "medium" ? 120 : 72;
+  const subtitleSize =
+    size === "hero" ? 40 : size === "medium" ? 26 : 18;
+  // Symbol vs subtitle vertical layout — subtitle sits below the symbol
+  // baseline with a comfortable gap. All naked type, no frame.
+  const symbolY = subtitle ? center.y - symbolSize * 0.15 : center.y + symbolSize * 0.18;
+  const subtitleY = center.y + symbolSize * 0.6;
+
+  // Estimate bbox from symbol dimensions (used for pulses/annotations).
+  const glyphW = symbolSize * 0.6;
+  const approxW = Math.max(symbol.length * glyphW, subtitle ? subtitle.length * subtitleSize * 0.55 : 0);
+  const approxH = symbolSize + (subtitle ? subtitleSize + 24 : 0);
+  const x = center.x - approxW / 2;
+  const y = center.y - approxH / 2;
+
+  // Per-letter reveal: staggered across the entry window. Subtle vertical
+  // drop on each letter.
+  const letterStart = 0.15;
+  const perLetter = (1 - letterStart) / Math.max(1, symbol.length);
+
+  // Subtle scale drift on the whole group for AE-grade motion.
+  const groupScale = 0.94 + progress * 0.06;
+
+  return {
+    id: id ?? "",
+    center,
+    bbox: { x, y, w: approxW, h: approxH },
+    render: () => (
+      <g
+        opacity={progress}
+        transform={`translate(${center.x} ${center.y}) scale(${groupScale}) translate(${-center.x} ${-center.y})`}
+      >
+        <g
+          fontFamily="'JetBrains Mono', 'SF Mono', 'Menlo', monospace"
+          fontWeight={700}
+          fontSize={symbolSize}
+          fill={TEXT_COLOR}
+          textAnchor="middle"
+        >
+          {letterStagger ? (
+            <SymbolLetters
+              text={symbol}
+              cx={center.x}
+              cy={symbolY}
+              size={symbolSize}
+              progress={progress}
+              letterStart={letterStart}
+              perLetter={perLetter}
+            />
+          ) : (
+            <text x={center.x} y={symbolY} dominantBaseline="middle">
+              {symbol}
+            </text>
+          )}
+        </g>
+        {subtitle ? (
+          <text
+            x={center.x}
+            y={subtitleY}
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.62)"
+            fontFamily="'Messina Sans', sans-serif"
+            fontSize={subtitleSize}
+            fontWeight={500}
+            letterSpacing={0.3}
+            opacity={Math.max(0, (progress - 0.6) / 0.4)}
+          >
+            {subtitle}
+          </text>
+        ) : null}
+      </g>
+    ),
+  };
+}
+
+const SymbolLetters: React.FC<{
+  text: string;
+  cx: number;
+  cy: number;
+  size: number;
+  progress: number;
+  letterStart: number;
+  perLetter: number;
+}> = ({ text, cx, cy, size, progress, letterStart, perLetter }) => {
+  // Approximate monospace glyph width — 0.6em is close for JetBrains Mono.
+  const glyphW = size * 0.6;
+  const totalW = glyphW * text.length;
+  const startX = cx - totalW / 2 + glyphW / 2;
+  return (
+    <>
+      {text.split("").map((ch, i) => {
+        const raw = (progress - letterStart - i * perLetter) / perLetter;
+        const p = ease(Math.min(1, Math.max(0, raw)), "outQuint");
+        const dy = (1 - p) * 26;
+        return (
+          <text
+            key={i}
+            x={startX + i * glyphW}
+            y={cy + dy}
+            dominantBaseline="middle"
+            opacity={p}
+          >
+            {ch}
+          </text>
+        );
+      })}
+    </>
+  );
+};
+
+function renderRow(
+  beat: Extract<Beat, { op: "row" }>,
+  progress: number,
+): Primitive {
+  const items = beat.items;
+  const y = (beat.y ?? 0.55) * COMP_H;
+  const itemSize = beat.itemSize ?? "medium";
+  const spacing = itemSize === "medium" ? 60 : 40;
+  const cardW = itemSize === "medium" ? 420 : 280;
+  const totalW = items.length * cardW + (items.length - 1) * spacing;
+  const startX = (COMP_W - totalW) / 2 + cardW / 2;
+  const staggerSec = beat.staggerSec ?? 0.09;
+  // Each item's local progress is offset by staggerSec worth of the entry
+  // window. Since we don't know the raw dur here, we approximate: full row
+  // progress covers all items, and each item's window is 1 - (n-1)*stagger'
+  // where stagger' is the normalized offset. Assume entry dur = 0.9s.
+  const entryDurSec = 0.9;
+  const perItemNorm = staggerSec / entryDurSec;
+
+  const nodes: React.ReactNode[] = [];
+  let minY = Infinity, maxY = -Infinity;
+
+  // Optional group title above the row.
+  const titleY = y - 200;
+  const titleOpacity = ease(Math.min(1, progress / 0.4), "outExpo");
+  if (beat.title) {
+    nodes.push(
+      <text
+        key="title"
+        x={COMP_W / 2}
+        y={titleY}
+        textAnchor="middle"
+        fill="rgba(255,255,255,0.55)"
+        fontFamily="'Messina Sans', sans-serif"
+        fontSize={44}
+        fontWeight={500}
+        letterSpacing={2}
+        opacity={titleOpacity}
+        transform={`translate(0 ${(1 - titleOpacity) * 12})`}
+      >
+        {beat.title.toUpperCase()}
+      </text>,
+    );
+    minY = Math.min(minY, titleY - 30);
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    const localRaw = (progress - i * perItemNorm) / (1 - (items.length - 1) * perItemNorm);
+    const localP = Math.min(1, Math.max(0, localRaw));
+    // Re-ease locally so stagger reads snappy — outBack for the pop.
+    const eased = ease(localP, "outBack");
+    const cx = startX + i * (cardW + spacing);
+    const prim = renderSymbolCardAt(
+      items[i].symbol,
+      items[i].subtitle,
+      { x: cx, y },
+      itemSize,
+      true,
+      eased,
+      undefined,
+    );
+    nodes.push(<g key={i}>{prim.render({ progress: 1, pulse: 0 })}</g>);
+    if (prim.bbox) {
+      minY = Math.min(minY, prim.bbox.y);
+      maxY = Math.max(maxY, prim.bbox.y + prim.bbox.h);
+    }
+  }
+
+  return {
+    id: beat.id ?? "",
+    center: { x: COMP_W / 2, y },
+    bbox: {
+      x: (COMP_W - totalW) / 2,
+      y: Number.isFinite(minY) ? minY : y,
+      w: totalW,
+      h: Number.isFinite(maxY) && Number.isFinite(minY) ? maxY - minY : 300,
+    },
+    render: () => <>{nodes}</>,
+  };
 }
 
 function renderCandles(

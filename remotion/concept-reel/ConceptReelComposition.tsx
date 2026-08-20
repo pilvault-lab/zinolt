@@ -2,12 +2,12 @@ import React from "react";
 import {
   AbsoluteFill,
   interpolate,
-  OffthreadVideo,
+  Sequence,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { Audio as MediaAudio, Video as MediaVideo } from "@remotion/media";
+import { Audio as MediaAudio } from "@remotion/media";
 import { Explainer } from "./Explainer";
 import { getConcept } from "@/lib/explainer/concepts";
 
@@ -29,31 +29,19 @@ export const CR_TAIL_PADDING_SEC = 2.0;
 
 export type ConceptReelWord = { text: string; start: number; end: number };
 export type ConceptReelMode = "text" | "diagram";
-export type ConceptReelBgKey = "none" | "bg-1" | "bg-2" | "bg-3" | "bg-4" | "bg-5" | "bg-6";
 
-export const CR_BG_OPTIONS: {
-  id: ConceptReelBgKey;
-  label: string;
-  file: string | null;
-}[] = [
-  { id: "none", label: "None (black)", file: null },
-  { id: "bg-1", label: "BG 1", file: "concept-reel/bg/bg-1.mp4" },
-  { id: "bg-2", label: "BG 2", file: "concept-reel/bg/bg-2.mp4" },
-  { id: "bg-3", label: "BG 3", file: "concept-reel/bg/bg-3.mp4" },
-  { id: "bg-4", label: "BG 4", file: "concept-reel/bg/bg-4.mp4" },
-  { id: "bg-5", label: "BG 5", file: "concept-reel/bg/bg-5.mp4" },
-  { id: "bg-6", label: "BG 6", file: "concept-reel/bg/bg-6.mp4" },
+/** Default background color when none is passed. Deep, matches paper contrast. */
+export const CR_DEFAULT_BG_COLOR = "#0A0A0A";
+
+/** Quick-pick swatches shown in the studio. Users can also enter any hex. */
+export const CR_BG_SWATCHES: { color: string; label: string }[] = [
+  { color: "#0A0A0A", label: "Ink" },
+  { color: "#000000", label: "Pure black" },
+  { color: "#0B1220", label: "Deep navy" },
+  { color: "#150A22", label: "Deep plum" },
+  { color: "#0A1A12", label: "Forest" },
+  { color: "#F5F1EA", label: "Paper" },
 ];
-
-export const CR_BG_FILE: Record<ConceptReelBgKey, string | null> = {
-  "none": null,
-  "bg-1": "concept-reel/bg/bg-1.mp4",
-  "bg-2": "concept-reel/bg/bg-2.mp4",
-  "bg-3": "concept-reel/bg/bg-3.mp4",
-  "bg-4": "concept-reel/bg/bg-4.mp4",
-  "bg-5": "concept-reel/bg/bg-5.mp4",
-  "bg-6": "concept-reel/bg/bg-6.mp4",
-};
 
 export type ConceptReelProps = {
   /** Full concept text (used for fallback display and grouping). */
@@ -70,9 +58,9 @@ export type ConceptReelProps = {
   diagramId?: string;
   /** Optional fps override — CLI passes this to render at a different rate than CR_FPS. */
   fpsOverride?: number;
-  /** Background: "none" = flat black, or one of the bg-N loops from public/concept-reel/bg/. */
-  bgKey?: ConceptReelBgKey;
-  /** true when we're doing a browser MP4 render — swap OffthreadVideo for @remotion/media <Video>. */
+  /** Background color (hex or css color). Defaults to CR_DEFAULT_BG_COLOR. */
+  bgColor?: string;
+  /** true when we're doing a browser MP4 render (retained for future use). */
   forRender?: boolean;
 };
 
@@ -82,7 +70,7 @@ export const conceptReelDefaultProps: ConceptReelProps = {
   audioSrc: "",
   mode: "text",
   diagramId: "",
-  bgKey: "bg-1",
+  bgColor: CR_DEFAULT_BG_COLOR,
   forRender: false,
 };
 
@@ -146,18 +134,16 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
   audioSrc,
   mode,
   diagramId,
-  bgKey = "bg-1",
-  forRender = false,
+  bgColor = CR_DEFAULT_BG_COLOR,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const tSec = frame / fps;
 
   const totalDurSec = durationInFrames / fps;
-  const bgFile = CR_BG_FILE[bgKey];
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0A0A0A" }}>
+    <AbsoluteFill style={{ backgroundColor: bgColor }}>
       {audioSrc ? (
         <MediaAudio
           src={
@@ -172,12 +158,7 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
         />
       ) : null}
 
-      {/* Background loop — object-fit: cover, muted, plus a dark scrim so text stays legible. */}
-      {bgFile ? (
-        <BackgroundVideo file={bgFile} forRender={forRender} />
-      ) : null}
-
-      {/* Faint moving glow — subtle life, no distraction */}
+      {/* Faint moving glow — subtle life on solid bgs, no distraction. */}
       <AmbientGlow tSec={tSec} totalDurSec={totalDurSec} />
 
       {mode === "text" ? (
@@ -186,38 +167,6 @@ export const ConceptReelComposition: React.FC<ConceptReelProps> = ({
         <DiagramBody diagramId={diagramId ?? ""} words={words} tSec={tSec} />
       )}
     </AbsoluteFill>
-  );
-};
-
-/* ─── Background loop ────────────────────────────────────────────────────── */
-const BackgroundVideo: React.FC<{ file: string; forRender: boolean }> = ({
-  file,
-  forRender,
-}) => {
-  const src = staticFile(file);
-  const style: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-  };
-  return (
-    <>
-      {forRender ? (
-        <MediaVideo src={src} muted volume={0} style={style} />
-      ) : (
-        <OffthreadVideo src={src} muted volume={0} style={style} />
-      )}
-      {/* Dark scrim keeps karaoke text high-contrast on top of any bg. */}
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.55) 100%)",
-          pointerEvents: "none",
-        }}
-      />
-    </>
   );
 };
 
@@ -362,6 +311,23 @@ const SceneText: React.FC<{
 };
 
 /* ─── Diagram Mode ───────────────────────────────────────────────────────── */
+
+/**
+ * SFX manifest — declarative sound-effect files. A `sfx` beat with `variant:
+ * "pop"` looks up SFX_MANIFEST["pop"]; if a variant isn't registered the beat
+ * is silently ignored. Drop MP3/WAV files into public/concept-reel/sfx/ and
+ * add the mapping here to enable playback. Keeps preview from breaking
+ * before assets exist.
+ */
+const SFX_MANIFEST: Partial<Record<string, string>> = {
+  // "click":  "concept-reel/sfx/click.mp3",
+  // "pop":    "concept-reel/sfx/pop.mp3",
+  // "tick":   "concept-reel/sfx/tick.mp3",
+  // "ding":   "concept-reel/sfx/ding.mp3",
+  // "swell":  "concept-reel/sfx/swell.mp3",
+  // "whoosh": "concept-reel/sfx/whoosh.mp3",
+};
+
 const DiagramBody: React.FC<{
   diagramId: string;
   words: ConceptReelWord[];
@@ -390,26 +356,58 @@ const DiagramBody: React.FC<{
       </AbsoluteFill>
     );
   }
+  const showTitle = script.layout !== "infographic";
   return (
     <>
-      {/* Title band above chart */}
-      <div
-        style={{
-          position: "absolute",
-          top: 200,
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          fontFamily: "'Messina Sans', sans-serif",
-          color: "rgba(255,255,255,0.85)",
-          fontSize: 62,
-          fontWeight: 600,
-          letterSpacing: -0.5,
-        }}
-      >
-        {script.label}
-      </div>
+      {showTitle ? (
+        <div
+          style={{
+            position: "absolute",
+            top: 200,
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            fontFamily: "'Messina Sans', sans-serif",
+            color: "rgba(255,255,255,0.85)",
+            fontSize: 62,
+            fontWeight: 600,
+            letterSpacing: -0.5,
+          }}
+        >
+          {script.label}
+        </div>
+      ) : null}
       <Explainer script={script} words={words} tSec={tSec} />
+      <SfxTrack script={script} words={words} />
+    </>
+  );
+};
+
+/**
+ * Renders one `<Sequence><MediaAudio/></Sequence>` per registered `sfx` beat.
+ * Time is derived from the word index the beat is pinned to. If the variant
+ * has no manifest entry, nothing mounts.
+ */
+const SfxTrack: React.FC<{
+  script: ReturnType<typeof getConcept>;
+  words: ConceptReelWord[];
+}> = ({ script, words }) => {
+  const { fps } = useVideoConfig();
+  if (!script || words.length === 0) return null;
+  return (
+    <>
+      {script.beats.map((beat, idx) => {
+        if (beat.op !== "sfx") return null;
+        const file = SFX_MANIFEST[beat.variant];
+        if (!file) return null;
+        const clamped = Math.max(0, Math.min(beat.atWord, words.length - 1));
+        const startFrame = Math.round(words[clamped].start * fps);
+        return (
+          <Sequence key={`sfx-${idx}`} from={startFrame}>
+            <MediaAudio src={staticFile(file)} volume={beat.volume ?? 0.6} />
+          </Sequence>
+        );
+      })}
     </>
   );
 };

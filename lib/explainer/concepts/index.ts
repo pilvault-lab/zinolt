@@ -1,9 +1,11 @@
 import type { ConceptScript } from "../types";
 import { fvgConcept } from "./fvg";
+import { tickerConcept } from "./ticker";
 import { whatIsTradingConcept } from "./what-is-trading";
 
 export const CONCEPTS: readonly ConceptScript[] = [
   fvgConcept,
+  tickerConcept,
   whatIsTradingConcept,
 ] as const;
 

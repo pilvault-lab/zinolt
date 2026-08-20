@@ -16,11 +16,11 @@ import {
   CR_EXPORT_FPS_FULL,
   CR_WIDTH,
   CR_HEIGHT,
-  CR_BG_OPTIONS,
+  CR_BG_SWATCHES,
+  CR_DEFAULT_BG_COLOR,
   type ConceptReelProps,
   type ConceptReelWord,
   type ConceptReelMode,
-  type ConceptReelBgKey,
 } from "@/remotion/concept-reel/ConceptReelComposition";
 import { CONCEPTS } from "@/lib/explainer/concepts";
 
@@ -58,8 +58,8 @@ export const ConceptReelStudio: React.FC = () => {
   const [voice, setVoice] = useState<string>(DEFAULT_VOICE);
   const [mode, setMode] = useState<ConceptReelMode>("text");
   const [diagramId, setDiagramId] = useState<string>("");
-  const [bgKey, setBgKey] = useState<ConceptReelBgKey>(
-    (conceptReelDefaultProps.bgKey ?? "bg-1") as ConceptReelBgKey,
+  const [bgColor, setBgColor] = useState<string>(
+    conceptReelDefaultProps.bgColor ?? CR_DEFAULT_BG_COLOR,
   );
 
   const [narration, setNarration] = useState<NarrationState>(null);
@@ -176,7 +176,7 @@ export const ConceptReelStudio: React.FC = () => {
     audioSrc: narration?.audioSrc ?? "",
     mode,
     diagramId,
-    bgKey,
+    bgColor,
     forRender: false,
   };
 
@@ -369,76 +369,55 @@ export const ConceptReelStudio: React.FC = () => {
             )}
           </div>
 
-          {/* Background */}
+          {/* Background color */}
           <div className="flex flex-col gap-3">
             <span
               className="font-sans text-xs uppercase tracking-wide"
               style={{ color: BRAND.colors.grey500 }}
             >
-              Background
+              Background color
             </span>
-            <div className="grid grid-cols-3 gap-2">
-              {CR_BG_OPTIONS.map((opt) => {
-                const active = bgKey === opt.id;
+            <div className="grid grid-cols-6 gap-2">
+              {CR_BG_SWATCHES.map((sw) => {
+                const active = bgColor.toLowerCase() === sw.color.toLowerCase();
                 return (
                   <button
-                    key={opt.id}
+                    key={sw.color}
                     type="button"
-                    onClick={() => setBgKey(opt.id)}
-                    className="relative overflow-hidden rounded-md border"
+                    onClick={() => setBgColor(sw.color)}
+                    title={`${sw.label} — ${sw.color}`}
+                    className="relative rounded-md"
                     style={{
-                      aspectRatio: "9 / 16",
-                      borderColor: active ? BRAND.colors.ink : BRAND.colors.grey200,
-                      borderWidth: active ? 2 : 1,
-                      backgroundColor: "#000",
+                      aspectRatio: "1 / 1",
+                      background: sw.color,
+                      border: `2px solid ${active ? BRAND.colors.ink : "transparent"}`,
+                      boxShadow: active ? "none" : `inset 0 0 0 1px ${BRAND.colors.grey200}`,
                     }}
-                    title={opt.label}
-                  >
-                    {opt.file ? (
-                      // eslint-disable-next-line jsx-a11y/media-has-caption
-                      <video
-                        src={`/${opt.file}`}
-                        muted
-                        loop
-                        autoPlay
-                        playsInline
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          background: "#0A0A0A",
-                          color: "rgba(255,255,255,0.5)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 10,
-                          letterSpacing: 2,
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        None
-                      </div>
-                    )}
-                    <span
-                      className="absolute bottom-1 left-1 rounded px-1.5 py-0.5 font-sans text-[10px]"
-                      style={{
-                        background: "rgba(0,0,0,0.65)",
-                        color: "#fff",
-                      }}
-                    >
-                      {opt.label}
-                    </span>
-                  </button>
+                  />
                 );
               })}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                aria-label="Pick background color"
+                className="h-8 w-10 cursor-pointer rounded border"
+                style={{ borderColor: BRAND.colors.grey200, padding: 0 }}
+              />
+              <input
+                type="text"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                spellCheck={false}
+                className="flex-1 rounded-md border px-2 py-1.5 font-mono text-xs uppercase"
+                style={{
+                  borderColor: BRAND.colors.grey200,
+                  color: BRAND.colors.ink,
+                  backgroundColor: "#FFFFFF",
+                }}
+              />
             </div>
           </div>
 
