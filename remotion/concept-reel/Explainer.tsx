@@ -41,8 +41,10 @@ const AXIS_COLOR = "rgba(255,255,255,0.28)";
 const GRID_COLOR = "rgba(255,255,255,0.08)";
 const TEXT_COLOR = "#FFFFFF";
 const DIM_TEXT_COLOR = "rgba(255,255,255,0.6)";
-const BULL_COLOR = "#22C55E";
-const BEAR_COLOR = "#EF4444";
+// Match the TradingView palette used by TvChartLayer so SVG wicks and TV
+// bodies read as one candle.
+const BULL_COLOR = "#26A69A";
+const BEAR_COLOR = "#EF5350";
 const ZONE_COLOR = "rgba(255,255,255,0.13)";
 const ZONE_STROKE = "rgba(255,255,255,0.65)";
 const MARKER_COLOR = "#FFFFFF";
@@ -254,7 +256,7 @@ function renderAnnotation(
   const bbox = target.bbox;
   const center = target.center ?? { x: COMP_W / 2, y: 1000 };
   const side = beat.side ?? "above";
-  const offset = 90;
+  const offset = beat.offset ?? 90;
   let labelPos: XY = { x: center.x, y: center.y };
   let anchorPos: XY = center;
   let textAnchor: "start" | "middle" | "end" = "middle";
@@ -737,13 +739,42 @@ function renderCandles(
     minY = Math.min(minY, wickTop);
     maxY = Math.max(maxY, wickBot);
 
-    if (skipDraw) continue; // TV canvas draws these; we only build bbox
-
     const bull = c.close >= c.open;
     const bodyTop = proj.y(Math.max(c.open, c.close));
     const bodyBot = proj.y(Math.min(c.open, c.close));
     const local = Math.min(1, Math.max(0, (progress - i * perStep) / perStep));
     const color = bull ? BULL_COLOR : BEAR_COLOR;
+
+    if (skipDraw) {
+      // TV canvas draws the body; SVG draws thick wicks on top so they
+      // read clearly at preview scale (TV's 1px wicks disappear when
+      // downscaled to the 380px preview). Two lines — top-of-body → high
+      // and bottom-of-body → low — instead of one line through the body.
+      nodes.push(
+        <g key={i} opacity={local}>
+          <line
+            x1={cx}
+            x2={cx}
+            y1={wickTop}
+            y2={bodyTop}
+            stroke={color}
+            strokeWidth={4}
+            strokeLinecap="round"
+          />
+          <line
+            x1={cx}
+            x2={cx}
+            y1={bodyBot}
+            y2={wickBot}
+            stroke={color}
+            strokeWidth={4}
+            strokeLinecap="round"
+          />
+        </g>,
+      );
+      continue;
+    }
+
     nodes.push(
       <g key={i} opacity={local}>
         <line

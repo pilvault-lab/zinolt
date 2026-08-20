@@ -40,11 +40,15 @@ export const TvChartLayer: React.FC<{
   const seriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
   const anchorRef = React.useRef<ISeriesApi<"Line"> | null>(null);
 
-  // Find the first candles beat — that's our data source. Additional
-  // candles beats aren't supported yet (multi-series would need per-beat
-  // series management).
-  const candlesBeat = React.useMemo(
-    () => script.beats.find((b): b is Extract<Beat, { op: "candles" }> => b.op === "candles"),
+  // Collect ALL candles beats — each contributes its candles to a single
+  // shared series, revealed independently based on that beat's word timing.
+  // Multiple beats let a concept introduce candles at different narrative
+  // moments (e.g. bullish hero first, bearish counter later).
+  const candlesBeats = React.useMemo(
+    () =>
+      script.beats.filter(
+        (b): b is Extract<Beat, { op: "candles" }> => b.op === "candles",
+      ),
     [script.beats],
   );
 
@@ -52,27 +56,41 @@ export const TvChartLayer: React.FC<{
 
   // Init + teardown.
   React.useEffect(() => {
-    if (!hostRef.current || !cfg || !candlesBeat) return;
+    if (!hostRef.current || !cfg || candlesBeats.length === 0) return;
     const chart = createChart(hostRef.current, {
       width: CHART_WIDTH,
       height: CHART_HEIGHT,
       layout: {
         background: { color: "transparent" },
-        textColor: "rgba(255,255,255,0.62)",
-        fontFamily: "'Messina Sans', sans-serif",
+        textColor: "rgba(255,255,255,0.75)",
+        fontFamily:
+          "'Trebuchet MS', 'Helvetica Neue', Helvetica, Arial, sans-serif",
         fontSize: 13,
+        // Hide the small "TV" attribution mark bottom-left.
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.06)" },
-        horzLines: { color: "rgba(255,255,255,0.08)" },
+        horzLines: { color: "rgba(255,255,255,0.06)" },
       },
       timeScale: {
         borderColor: "rgba(255,255,255,0.18)",
-        visible: false, // synthetic timestamps — labels aren't meaningful
+        timeVisible: false,
+        secondsVisible: false,
+        // No rightOffset / barSpacing — let TV auto-fit the visible time
+        // range across the full chart width so candle x positions match
+        // the SVG Projector exactly (both use t/timeSteps * CHART_WIDTH).
+        fixLeftEdge: true,
+        fixRightEdge: true,
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.18)",
         autoScale: false,
+        // Zero margins so TV's price scale matches the SVG Projector exactly
+        // (both span priceMin..priceMax over the full chart height). This lets
+        // the SVG wick overlay in Explainer.tsx sit on top of TV bodies with
+        // pixel-perfect alignment.
+        scaleMargins: { top: 0, bottom: 0 },
       },
       crosshair: { mode: 0, vertLine: { visible: false }, horzLine: { visible: false } },
       handleScale: false,
@@ -80,14 +98,17 @@ export const TvChartLayer: React.FC<{
     });
 
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#22C55E",
-      downColor: "#EF4444",
-      borderUpColor: "#22C55E",
-      borderDownColor: "#EF4444",
-      wickUpColor: "#22C55E",
-      wickDownColor: "#EF4444",
-      // Suppress the "last close" dashed line + right-axis highlight — this
-      // is a video, not a live trading widget.
+      // Classic TradingView palette: teal / soft red — not our brand green.
+      upColor: "#26A69A",
+      downColor: "#EF5350",
+      borderUpColor: "#26A69A",
+      borderDownColor: "#EF5350",
+      // TV wicks disabled — SVG overlay (Explainer.renderCandles) draws
+      // thick wicks on top so they read clearly at preview scale.
+      wickVisible: false,
+      wickUpColor: "#26A69A",
+      wickDownColor: "#EF5350",
+      // No live price tag on the right axis — this is a video, not a widget.
       priceLineVisible: false,
       lastValueVisible: false,
     });
@@ -101,7 +122,7 @@ export const TvChartLayer: React.FC<{
       crosshairMarkerVisible: false,
     });
     const anchorTimeStart = 1_700_000_000 as unknown as Time;
-    const anchorTimeEnd = (1_700_000_000 + (cfg.timeSteps + 1) * 60) as unknown as Time;
+    const anchorTimeEnd = (1_700_000_000 + (cfg.timeSteps + 1) * 86_400) as unknown as Time;
     anchor.setData([
       { time: anchorTimeStart, value: cfg.priceMin },
       { time: anchorTimeEnd, value: cfg.priceMax },
@@ -117,41 +138,58 @@ export const TvChartLayer: React.FC<{
       seriesRef.current = null;
       anchorRef.current = null;
     };
-  }, [cfg, candlesBeat]);
+  }, [cfg, candlesBeats]);
 
-  // Per-frame reveal: recompute how many candles should be visible.
+  // Per-frame reveal: iterate every candles beat, compute its progressive
+  // reveal count, and collect the union into a single time-sorted series.
   React.useEffect(() => {
     const series = seriesRef.current;
     const chart = chartRef.current;
-    if (!series || !chart || !candlesBeat || words.length === 0) return;
-    const clamped = Math.max(0, Math.min(candlesBeat.atWord, words.length - 1));
-    const beatStart = words[clamped].start;
-    const dur = candlesBeat.animDurationSec ?? 0.9;
-    const rawProgress = (tSec - beatStart) / dur;
-    const progress = Math.min(1, Math.max(0, rawProgress));
-    const total = candlesBeat.candles.length;
-    const revealCount = tSec < beatStart ? 0 : Math.max(1, Math.ceil(progress * total));
-
-    const tStart = candlesBeat.tStart ?? 0;
+    if (!series || !chart || candlesBeats.length === 0 || words.length === 0) return;
     const baseTime = 1_700_000_000;
-    const data = candlesBeat.candles.slice(0, revealCount).map((c, i) => ({
-      time: (baseTime + (tStart + i) * 60) as unknown as Time,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }));
+
+    const data: Array<{
+      time: Time;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+    }> = [];
+
+    for (const beat of candlesBeats) {
+      const clamped = Math.max(0, Math.min(beat.atWord, words.length - 1));
+      const beatStart = words[clamped].start;
+      if (tSec < beatStart) continue;
+      const dur = beat.animDurationSec ?? 0.9;
+      const rawProgress = (tSec - beatStart) / dur;
+      const progress = Math.min(1, Math.max(0, rawProgress));
+      const total = beat.candles.length;
+      const revealCount = Math.max(1, Math.ceil(progress * total));
+      const tStart = beat.tStart ?? 0;
+      for (let i = 0; i < revealCount; i++) {
+        const c = beat.candles[i];
+        data.push({
+          time: (baseTime + Math.round((tStart + i) * 86_400)) as unknown as Time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        });
+      }
+    }
+
+    // TV requires strictly ascending times; sort in case beats declare
+    // out-of-order t values.
+    data.sort((a, b) => (a.time as number) - (b.time as number));
     series.setData(data);
 
-    // Lock the visible time range to the full chart span so candles don't
-    // resize as new bars are appended.
     chart.timeScale().setVisibleRange({
       from: baseTime as unknown as Time,
-      to: (baseTime + (cfg?.timeSteps ?? 5) * 60) as unknown as Time,
+      to: (baseTime + (cfg?.timeSteps ?? 5) * 86_400) as unknown as Time,
     });
-  }, [tSec, candlesBeat, cfg, words]);
+  }, [tSec, candlesBeats, cfg, words]);
 
-  if (!cfg || !candlesBeat) return null;
+  if (!cfg || candlesBeats.length === 0) return null;
 
   return (
     <div

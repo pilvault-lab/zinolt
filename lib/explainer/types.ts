@@ -129,6 +129,12 @@ export type AnnotationBeat = BeatBase & {
   text: string;
   /** Where the annotation text sits relative to the target. Default "above". */
   side?: "above" | "below" | "left" | "right";
+  /**
+   * Pixel distance from the target edge to the label. Default 90. Bump this
+   * when the label would otherwise collide with nearby content (e.g. a tall
+   * candle wick sitting between the anchor and a "side: above" label).
+   */
+  offset?: number;
 };
 
 export type LabelBeat = BeatBase & {
