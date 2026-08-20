@@ -9,6 +9,7 @@ import {
 } from "remotion";
 import { Audio as MediaAudio } from "@remotion/media";
 import { Explainer } from "./Explainer";
+import { TvChartLayer } from "./TvChartLayer";
 import { getConcept } from "@/lib/explainer/concepts";
 
 // Composition runs at 60fps — buttery for the in-studio preview. Exports
@@ -357,6 +358,7 @@ const DiagramBody: React.FC<{
     );
   }
   const showTitle = script.layout !== "infographic";
+  const tvMode = script.chart?.renderer === "tv";
   return (
     <>
       {showTitle ? (
@@ -377,6 +379,7 @@ const DiagramBody: React.FC<{
           {script.label}
         </div>
       ) : null}
+      {tvMode ? <TvChartLayer script={script} words={words} tSec={tSec} /> : null}
       <Explainer script={script} words={words} tSec={tSec} />
       <SfxTrack script={script} words={words} />
     </>

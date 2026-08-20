@@ -19,15 +19,16 @@ import type { ConceptReelWord } from "./ConceptReelComposition";
  * with the composition size.
  */
 
+import {
+  CHART_TOP,
+  CHART_HEIGHT,
+  CHART_LEFT,
+  CHART_RIGHT,
+  CHART_WIDTH,
+} from "./chart-geometry";
+
 const COMP_W = 1080;
 const COMP_H = 1920;
-// Chart occupies the middle of the reel. Left/right margins reserve room for
-// the price axis and side-anchored annotations, so nothing spills off-screen.
-const CHART_TOP = 480;
-const CHART_HEIGHT = 900;
-const CHART_LEFT = 130;
-const CHART_RIGHT = 940;
-const CHART_WIDTH = CHART_RIGHT - CHART_LEFT;
 
 // Composition-wide safe zone — anything drawn outside this rect risks
 // clipping. Annotations self-clamp to these bounds.
@@ -174,7 +175,12 @@ export const Explainer: React.FC<{
       annotationBeats.push({ beat, progress, exit });
       continue;
     }
-    const prim = renderPrimitive(beat, proj, progress);
+    const prim = renderPrimitive(
+      beat,
+      proj,
+      progress,
+      script.chart?.renderer ?? "svg",
+    );
     if (!prim) continue;
     if (exit > 0) primitives.push(wrapExit(prim, exit));
     else primitives.push(prim);
@@ -215,7 +221,10 @@ export const Explainer: React.FC<{
       textRendering="geometricPrecision"
       style={{ position: "absolute", left: 0, top: 0 }}
     >
-      {script.chart && proj && script.layout !== "infographic" ? (
+      {script.chart &&
+      proj &&
+      script.layout !== "infographic" &&
+      script.chart.renderer !== "tv" ? (
         <ChartFrame cfg={script.chart} proj={proj} />
       ) : null}
 
@@ -384,11 +393,19 @@ function renderPrimitive(
   beat: Beat,
   proj: Projector | null,
   progress: number,
+  chartMode: "svg" | "tv" = "svg",
 ): Primitive | null {
   switch (beat.op) {
     case "candles":
       if (!proj) return null;
-      return renderCandles(beat.candles, beat.tStart ?? 0, proj, progress, beat.id);
+      return renderCandles(
+        beat.candles,
+        beat.tStart ?? 0,
+        proj,
+        progress,
+        beat.id,
+        chartMode === "tv",
+      );
     case "hline":
       if (!proj) return null;
       return renderHLine(beat.y, beat.label, proj, progress, beat.id);
@@ -701,6 +718,7 @@ function renderCandles(
   proj: Projector,
   progress: number,
   id?: string,
+  skipDraw = false,
 ): Primitive {
   const bodyW = proj.candleWidth();
   const revealCount = Math.min(candles.length, Math.ceil(progress * candles.length + 0.001));
@@ -711,18 +729,23 @@ function renderCandles(
   for (let i = 0; i < candles.length; i++) {
     if (i >= revealCount) break;
     const c = candles[i];
-    const bull = c.close >= c.open;
     const cx = proj.x(tStart + i);
     const wickTop = proj.y(c.high);
     const wickBot = proj.y(c.low);
+    minX = Math.min(minX, cx - bodyW / 2);
+    maxX = Math.max(maxX, cx + bodyW / 2);
+    minY = Math.min(minY, wickTop);
+    maxY = Math.max(maxY, wickBot);
+
+    if (skipDraw) continue; // TV canvas draws these; we only build bbox
+
+    const bull = c.close >= c.open;
     const bodyTop = proj.y(Math.max(c.open, c.close));
     const bodyBot = proj.y(Math.min(c.open, c.close));
-    // per-candle progress for a subtle grow-in
     const local = Math.min(1, Math.max(0, (progress - i * perStep) / perStep));
     const color = bull ? BULL_COLOR : BEAR_COLOR;
-    const opacity = local;
     nodes.push(
-      <g key={i} opacity={opacity}>
+      <g key={i} opacity={local}>
         <line
           x1={cx}
           x2={cx}
@@ -743,10 +766,6 @@ function renderCandles(
         />
       </g>,
     );
-    minX = Math.min(minX, cx - bodyW / 2);
-    maxX = Math.max(maxX, cx + bodyW / 2);
-    minY = Math.min(minY, wickTop);
-    maxY = Math.max(maxY, wickBot);
   }
 
   return {

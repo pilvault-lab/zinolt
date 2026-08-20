@@ -251,6 +251,13 @@ export type ChartConfig = {
   showPriceAxis?: boolean;
   /** Show a subtle grid. Default true. */
   showGrid?: boolean;
+  /**
+   * "svg" (default) draws our custom candles + grid. "tv" mounts the
+   * lightweight-charts canvas (real TradingView aesthetic) sized to the
+   * same rect. Overlays (marker/zone/hline/line/annotation) still use SVG
+   * on top so the beat vocabulary is unchanged.
+   */
+  renderer?: "svg" | "tv";
 };
 
 export type ConceptScript = {

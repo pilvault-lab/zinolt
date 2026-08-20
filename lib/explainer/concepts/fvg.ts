@@ -37,6 +37,7 @@ export const fvgConcept: ConceptScript = {
     timeSteps: 5,        // candles at t=1,2,3 leaving margins
     showPriceAxis: true,
     showGrid: true,
+    renderer: "tv",      // TradingView-native candles via lightweight-charts
   },
   // Narration word indices (0-based, whitespace-split):
   // 0:A 1:Fair 2:Value 3:Gap 4:is 5:a 6:three-candle 7:pattern 8:where

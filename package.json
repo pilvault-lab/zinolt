@@ -27,6 +27,7 @@
     "clsx": "^2.1.1",
     "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
+    "lightweight-charts": "^5.2.1",
     "lucide-react": "^1.20.0",
     "meshline": "^3.3.1",
     "msedge-tts": "^2.0.7",
