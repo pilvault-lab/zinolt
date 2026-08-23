@@ -77,6 +77,9 @@ export type HLineBeat = BeatBase & {
   y: number;
   /** Optional label rendered at the right end. */
   label?: string;
+  /** Line + label color. Defaults to white. Use to distinguish
+   * support (green) from resistance (red), etc. */
+  color?: string;
 };
 
 export type VLineBeat = BeatBase & {

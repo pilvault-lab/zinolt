@@ -410,7 +410,7 @@ function renderPrimitive(
       );
     case "hline":
       if (!proj) return null;
-      return renderHLine(beat.y, beat.label, proj, progress, beat.id);
+      return renderHLine(beat.y, beat.label, beat.color, proj, progress, beat.id);
     case "vline":
       if (!proj) return null;
       return renderVLine(beat.t, beat.label, proj, progress, beat.id);
@@ -813,6 +813,7 @@ function renderCandles(
 function renderHLine(
   yPrice: number,
   label: string | undefined,
+  color: string | undefined,
   proj: Projector,
   progress: number,
   id?: string,
@@ -822,6 +823,7 @@ function renderHLine(
   const gapLen = 6;
   const totalLen = CHART_WIDTH;
   const drawn = totalLen * progress;
+  const stroke = color ?? TEXT_COLOR;
   return {
     id: id ?? "",
     center: { x: (CHART_LEFT + CHART_RIGHT) / 2, y },
@@ -833,17 +835,19 @@ function renderHLine(
           y1={y}
           x2={CHART_LEFT + drawn}
           y2={y}
-          stroke={TEXT_COLOR}
-          strokeWidth={1.5}
+          stroke={stroke}
+          strokeWidth={2}
           strokeDasharray={`${dashLen} ${gapLen}`}
         />
         {label && progress > 0.8 ? (
           <text
             x={CHART_LEFT + 8}
             y={y - 10}
-            fill={TEXT_COLOR}
+            fill={stroke}
             fontFamily="'Messina Sans', sans-serif"
-            fontSize={22}
+            fontSize={24}
+            fontWeight={600}
+            letterSpacing={1.5}
           >
             {label}
           </text>
