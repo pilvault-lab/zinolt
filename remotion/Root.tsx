@@ -57,6 +57,16 @@ import {
   HE_HEIGHT,
   HE_WIDTH,
 } from "./hype-edit/HypeEdit";
+import {
+  WaveformReelComposition,
+  waveformReelDefaultProps,
+  computeWaveformDurationFrames,
+  WR_FPS,
+  WR_HEIGHT,
+  WR_WIDTH,
+  WR_DEFAULT_DURATION_FRAMES,
+  type WaveformReelProps,
+} from "./waveform-reel/WaveformReel";
 
 const TWEET_FPS = 30;
 const TWEET_DURATION = 30 * 7;
@@ -113,7 +123,8 @@ export const RemotionRoot: React.FC = () => (
         t.id !== "story-card" &&
         t.id !== "ranking" &&
         t.id !== "concept-reel" &&
-        t.id !== "hype-edit",
+        t.id !== "hype-edit" &&
+        t.id !== "waveform-reel",
     ).map((t) => (
       <Composition
         key={t.compositionId}
@@ -142,6 +153,24 @@ export const RemotionRoot: React.FC = () => (
           fps,
           width: CR_WIDTH,
           height: CR_HEIGHT,
+        };
+      }}
+    />
+    <Composition
+      id="WaveformReel"
+      component={WaveformReelComposition}
+      durationInFrames={WR_DEFAULT_DURATION_FRAMES}
+      fps={WR_FPS}
+      width={WR_WIDTH}
+      height={WR_HEIGHT}
+      defaultProps={waveformReelDefaultProps}
+      calculateMetadata={({ props }) => {
+        const p = props as WaveformReelProps;
+        return {
+          durationInFrames: computeWaveformDurationFrames(p.analysis, WR_FPS),
+          fps: WR_FPS,
+          width: WR_WIDTH,
+          height: WR_HEIGHT,
         };
       }}
     />

@@ -155,6 +155,14 @@ export const TEMPLATES: readonly Template[] = [
     href: "/concept-reel",
   },
   {
+    id: "waveform-reel",
+    compositionId: "WaveformReel",
+    label: "Waveform Reel",
+    background: "",
+    preview: "/waveform-reel/preview.svg",
+    href: "/waveform-reel",
+  },
+  {
     id: "hype-edit",
     compositionId: "HypeEdit",
     label: "Hype Edit",

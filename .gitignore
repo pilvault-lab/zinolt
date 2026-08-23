@@ -74,6 +74,9 @@ public/frame-grab/picked-*/
 # TikTok cache
 .tiktok-cache/
 
+# Waveform Reel cache (uploaded / YouTube-fetched audio, per-machine)
+.waveform-reel-cache/
+
 # yt-dlp browser cookies export (never commit — contains session tokens)
 cookies.txt
 
