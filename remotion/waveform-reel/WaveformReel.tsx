@@ -15,8 +15,8 @@ import { OrbVisualizer } from "./OrbVisualizer";
 export const WR_FPS = 60;
 export const WR_WIDTH = 1080;
 export const WR_HEIGHT = 1920;
-/** House palette. */
-export const WR_BG = "#0A0A0A";
+/** House palette. Pure #000 so bloom fades edge-to-edge with no visible lift. */
+export const WR_BG = "#000000";
 export const WR_FG = "#FFFFFF";
 export const WR_DEFAULT_DURATION_FRAMES = WR_FPS * 8;
 
@@ -157,19 +157,18 @@ const StageWithFilters: React.FC<{
       shapeRendering="geometricPrecision"
     >
       <defs>
-        {/* 3-pass additive bloom. Big soft halo + mid glow + crisp edge + original. */}
-        <filter id={bloomId} x="-25%" y="-25%" width="150%" height="150%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b1" />
-          <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="b2" />
-          <feGaussianBlur in="SourceGraphic" stdDeviation="48" result="b3" />
+        {/* Tight 2-pass bloom. Only the crisp inner halo + a compact mid glow
+         *  survive; the far outer pass was removed because it left visible
+         *  residue on the pure-black background. Gaussian falloff is short
+         *  enough at stdDev<=14 that the halo dies within a few dozen px of
+         *  the source pixel. */}
+        <filter id={bloomId} x="-15%" y="-15%" width="130%" height="130%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b1" />
+          <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="b2" />
           <feComponentTransfer in="b2" result="b2a">
-            <feFuncA type="linear" slope={0.9 + config.glow * 0.6} />
-          </feComponentTransfer>
-          <feComponentTransfer in="b3" result="b3a">
-            <feFuncA type="linear" slope={0.55 + config.glow * 0.8} />
+            <feFuncA type="linear" slope={0.55 + config.glow * 0.55} />
           </feComponentTransfer>
           <feMerge>
-            <feMergeNode in="b3a" />
             <feMergeNode in="b2a" />
             <feMergeNode in="b1" />
             <feMergeNode in="SourceGraphic" />
@@ -182,23 +181,7 @@ const StageWithFilters: React.FC<{
           <stop offset="45%" stopColor="#F6F6F0" stopOpacity="1" />
           <stop offset="100%" stopColor="#B8B8B0" stopOpacity="0.9" />
         </linearGradient>
-
-        {/* Centered radial breathing glow. */}
-        <radialGradient id="wr-halo" cx="50%" cy="50%" r="55%">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.06 + bass * 0.14} />
-          <stop offset="60%" stopColor="#FFFFFF" stopOpacity={0.015 + bass * 0.05} />
-          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
-
-        {/* Corner vignette. */}
-        <radialGradient id="wr-vignette" cx="50%" cy="50%" r="72%">
-          <stop offset="60%" stopColor="#000000" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.55" />
-        </radialGradient>
       </defs>
-
-      {/* Halo (behind everything). */}
-      <rect x="0" y="0" width={WR_WIDTH} height={WR_HEIGHT} fill="url(#wr-halo)" />
 
       {/* Bass-pulse scale wrapper — the whole visualizer breathes on the kick. */}
       <g
@@ -212,16 +195,6 @@ const StageWithFilters: React.FC<{
           frame={clampedFrame}
         />
       </g>
-
-      {/* Vignette on top. */}
-      <rect
-        x="0"
-        y="0"
-        width={WR_WIDTH}
-        height={WR_HEIGHT}
-        fill="url(#wr-vignette)"
-        pointerEvents="none"
-      />
     </svg>
   );
 };
