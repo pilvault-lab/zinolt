@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Player } from "@remotion/player";
 import { canRenderMediaOnWeb, renderMediaOnWeb } from "@remotion/web-renderer";
+import { upload as blobUpload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 import { Header } from "../../_components/Header";
@@ -146,38 +147,76 @@ export const WaveformReelStudio: React.FC = () => {
   }, []);
 
   // ------- Ingest -------
+  const [uploadPct, setUploadPct] = useState(0);
   const ingestFile = useCallback(async (file: File) => {
     setIngestError("");
     setIsIngesting(true);
+    setUploadPct(0);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/waveform-reel/audio", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || `ingest_${res.status}`);
+      // Try direct-to-Blob upload first. This bypasses Vercel's 4.5 MB
+      // function-body cap — bytes stream straight from the browser to Blob
+      // storage. If Blob isn't configured (local dev without token) the
+      // upload rejects instantly and we fall through to the multipart
+      // route so local uploads keep working.
+      const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 80);
+      const pathname = `waveform-reel/uploads/${Date.now()}-${safeName}`;
+      let blobUrl: string | null = null;
+      try {
+        const blob = await blobUpload(pathname, file, {
+          access: "public",
+          handleUploadUrl: "/api/waveform-reel/upload-token",
+          contentType: file.type || "audio/mpeg",
+          onUploadProgress: (p) => setUploadPct(p.percentage),
+        });
+        blobUrl = blob.url;
+      } catch {
+        blobUrl = null;
       }
-      const j = (await res.json()) as {
-        audioUrl: string;
-        source: "upload";
-        key: string;
-        name: string;
-      };
+
+      let audioUrl: string;
+      let key: string;
+      if (blobUrl) {
+        const res = await fetch("/api/waveform-reel/audio", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ blobUrl, name: file.name }),
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error || `register_${res.status}`);
+        }
+        const j = (await res.json()) as { audioUrl: string; key: string };
+        audioUrl = j.audioUrl;
+        key = j.key;
+      } else {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/waveform-reel/audio", {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error || `ingest_${res.status}`);
+        }
+        const j = (await res.json()) as { audioUrl: string; key: string };
+        audioUrl = j.audioUrl;
+        key = j.key;
+      }
+
       setSource({
         kind: "ready",
-        audioUrl: j.audioUrl,
+        audioUrl,
         source: "upload",
-        key: j.key,
-        label: j.name,
+        key,
+        label: file.name,
       });
-      await decode(j.audioUrl);
+      await decode(audioUrl);
     } catch (err) {
       setIngestError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsIngesting(false);
+      setUploadPct(0);
     }
   }, [decode]);
 
@@ -383,7 +422,11 @@ export const WaveformReelStudio: React.FC = () => {
                   }}
                   disabled={isIngesting}
                 />
-                {isIngesting ? "Uploading…" : "Drop or choose audio / video"}
+                {isIngesting
+                  ? uploadPct > 0 && uploadPct < 100
+                    ? `Uploading ${Math.round(uploadPct)}%`
+                    : "Uploading…"
+                  : "Drop or choose audio / video"}
               </label>
             ) : (
               <div className="flex flex-col gap-2">

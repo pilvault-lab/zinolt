@@ -36,12 +36,30 @@ export async function POST(req: Request) {
     });
   }
 
-  let body: { url?: string };
+  let body: { url?: string; blobUrl?: string; name?: string };
   try {
-    body = (await req.json()) as { url?: string };
+    body = (await req.json()) as {
+      url?: string;
+      blobUrl?: string;
+      name?: string;
+    };
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
+
+  // Client already uploaded direct-to-Blob and just wants us to acknowledge
+  // the registration. Nothing to do server-side — the browser can decode
+  // straight from the public Blob URL. Round-trip keeps the client's ingest
+  // machinery symmetric with the YouTube flow.
+  if (body.blobUrl) {
+    return NextResponse.json({
+      audioUrl: body.blobUrl,
+      key: `blob-${Date.now().toString(36)}`,
+      source: "upload",
+      name: body.name ?? "audio",
+    });
+  }
+
   const url = (body.url ?? "").trim();
   if (!url) return NextResponse.json({ error: "missing_url" }, { status: 400 });
 
