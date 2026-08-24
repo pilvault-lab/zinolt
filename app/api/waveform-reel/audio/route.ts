@@ -52,12 +52,29 @@ async function handle(req: Request) {
     });
   }
 
-  let body: { url?: string };
+  let body: { url?: string; blobUrl?: string; name?: string };
   try {
-    body = (await req.json()) as { url?: string };
+    body = (await req.json()) as {
+      url?: string;
+      blobUrl?: string;
+      name?: string;
+    };
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
+
+  // Direct-Blob upload already landed on the client side. Nothing to do
+  // server-side — the browser decodes straight from the Blob URL. Round-trip
+  // exists so the client's ingest machinery stays symmetric with URL fetch.
+  if (body.blobUrl) {
+    return NextResponse.json({
+      audioUrl: body.blobUrl,
+      key: `blob-${Date.now().toString(36)}`,
+      source: "upload",
+      name: body.name ?? "audio",
+    });
+  }
+
   const url = (body.url ?? "").trim();
   if (!url) return NextResponse.json({ error: "missing_url" }, { status: 400 });
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Player } from "@remotion/player";
 import { canRenderMediaOnWeb, renderMediaOnWeb } from "@remotion/web-renderer";
+import { upload as blobUpload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 import { Header } from "../../_components/Header";
@@ -146,40 +147,111 @@ export const WaveformReelStudio: React.FC = () => {
   }, []);
 
   // ------- Ingest -------
+  const [, setUploadPct] = useState(0);
+  const [ingestStage, setIngestStage] = useState("");
   const ingestFile = useCallback(async (file: File) => {
     setIngestError("");
     setIsIngesting(true);
+    setUploadPct(0);
+    setIngestStage("");
+    const stage = (s: string) => {
+      setIngestStage(s);
+      console.log(`[wr ingest] ${s}`);
+    };
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/waveform-reel/audio", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || `ingest_${res.status}`);
+      // Try direct-to-Blob multipart upload first. `multipart: true` chunks
+      // the file into 8MB pieces uploaded in parallel — more resilient than
+      // single-shot upload and doesn't stall on the finalization webhook the
+      // way the previous non-multipart attempt did (hang at 94%). If Blob
+      // isn't configured (local dev without token) or the upload times out,
+      // fall back to the legacy multipart-body POST.
+      const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 80);
+      const pathname = `waveform-reel/uploads/${Date.now()}-${safeName}`;
+      stage(`starting Blob upload (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+      let blobUrl: string | null = null;
+      try {
+        // 90s hard cap covers the whole flow: token mint + all chunks +
+        // finalization webhook. If we hit this, something's wrong on the
+        // Blob side and we should fall back rather than hang the UI.
+        const blob = await Promise.race([
+          blobUpload(pathname, file, {
+            access: "public",
+            handleUploadUrl: "/api/waveform-reel/upload-token",
+            contentType: file.type || "audio/mpeg",
+            multipart: true,
+            onUploadProgress: (p) => {
+              setUploadPct(p.percentage);
+              if (p.percentage >= 99.5) {
+                stage("waiting for Blob to finalize");
+              } else {
+                stage(`uploading to Blob (${Math.round(p.percentage)}%)`);
+              }
+            },
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("blob_upload_timeout_90s")), 90_000),
+          ),
+        ]);
+        blobUrl = blob.url;
+        stage("Blob upload complete");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        stage(`Blob path failed (${msg.slice(0, 60)}) — falling back to server multipart`);
+        blobUrl = null;
       }
-      const j = (await res.json()) as {
-        audioUrl: string;
-        source: "upload";
-        key: string;
-        name: string;
-      };
+
+      let audioUrl: string;
+      let key: string;
+      if (blobUrl) {
+        stage("registering Blob URL");
+        const res = await fetch("/api/waveform-reel/audio", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ blobUrl, name: file.name }),
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error || `register_${res.status}`);
+        }
+        const j = (await res.json()) as { audioUrl: string; key: string };
+        audioUrl = j.audioUrl;
+        key = j.key;
+      } else {
+        stage("uploading via server multipart (fallback)");
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/waveform-reel/audio", {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error || `ingest_${res.status}`);
+        }
+        const j = (await res.json()) as { audioUrl: string; key: string };
+        audioUrl = j.audioUrl;
+        key = j.key;
+      }
+
+      stage("decoding audio");
       setSource({
         kind: "ready",
-        audioUrl: j.audioUrl,
+        audioUrl,
         source: "upload",
-        key: j.key,
-        label: j.name,
+        key,
+        label: file.name,
       });
-      await decode(j.audioUrl);
+      await decode(audioUrl);
+      stage("done");
     } catch (err) {
-      setIngestError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[wr ingest] failed at "${ingestStage}":`, err);
+      setIngestError(`${msg} — see console for the stage that failed.`);
     } finally {
       setIsIngesting(false);
+      setUploadPct(0);
     }
-  }, [decode]);
+  }, [decode, ingestStage]);
 
   const ingestUrl = useCallback(async () => {
     const url = ytUrl.trim();
@@ -383,7 +455,9 @@ export const WaveformReelStudio: React.FC = () => {
                   }}
                   disabled={isIngesting}
                 />
-                {isIngesting ? "Uploading…" : "Drop or choose audio / video"}
+                {isIngesting
+                  ? ingestStage || "Uploading…"
+                  : "Drop or choose audio / video"}
               </label>
             ) : (
               <div className="flex flex-col gap-2">
