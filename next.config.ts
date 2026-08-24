@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "/api/reel-safe": ["./scripts/reel-safe-pipeline.mjs"],
     "/api/frame-grab": ["./scripts/frame-grab-pipeline.mjs"],
     "/api/frame-grab/resolve": ["./scripts/frame-grab-youtube-pipeline.mjs"],
+    "/api/waveform-reel/audio": ["./scripts/waveform-reel-fetch-audio.mjs"],
   },
   async headers() {
     return [

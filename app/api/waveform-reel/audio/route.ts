@@ -1,13 +1,29 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { ingestUpload, ingestYouTube } from "@/lib/waveform-reel/ingest";
+import { runFetchAudioSandbox, sandboxAvailable } from "@/lib/waveform-reel/sandbox";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const MAX_UPLOAD_BYTES = 200 * 1024 * 1024; // 200 MB — a longer video track fits.
+const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 export async function POST(req: Request) {
+  try {
+    return await handle(req);
+  } catch (err) {
+    // Any uncaught throw (e.g. spawn ENOENT when yt-dlp is missing on
+    // serverless) becomes a readable 502 instead of a raw 500.
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: `ingest_crashed: ${msg.slice(0, 300)}` },
+      { status: 502 },
+    );
+  }
+}
+
+async function handle(req: Request) {
   const contentType = req.headers.get("content-type") ?? "";
 
   if (contentType.startsWith("multipart/form-data")) {
@@ -45,6 +61,27 @@ export async function POST(req: Request) {
   const url = (body.url ?? "").trim();
   if (!url) return NextResponse.json({ error: "missing_url" }, { status: 400 });
 
+  // Deployed Vercel: no yt-dlp in the serverless runtime. Spawn a Firecracker
+  // microVM via Vercel Sandbox, install yt-dlp inside, download bestaudio,
+  // upload to Blob, return the public Blob URL. Same pattern frame-grab uses.
+  if (sandboxAvailable()) {
+    const jobId = `wr-${Date.now()}-${randomBytes(3).toString("hex")}`;
+    const res = await runFetchAudioSandbox({ jobId, url });
+    if ("error" in res) {
+      return NextResponse.json({ error: res.error }, { status: 502 });
+    }
+    return NextResponse.json({
+      audioUrl: res.blobUrl,
+      key: `blob-${res.pathname}`,
+      mime: res.mime,
+      ext: res.ext,
+      source: "youtube",
+      title: res.title,
+      channel: res.channel,
+    });
+  }
+
+  // Local dev (or any env without Vercel Sandbox creds): use local yt-dlp.
   const res = await ingestYouTube(url);
   if ("error" in res) {
     return NextResponse.json(res, { status: 502 });
