@@ -98,7 +98,21 @@ async function handle(req: Request) {
     });
   }
 
-  // Local dev (or any env without Vercel Sandbox creds): use local yt-dlp.
+  // No sandbox creds. On Vercel that means OIDC federation is disabled —
+  // surface an actionable message instead of trying local yt-dlp (which
+  // doesn't exist in the serverless runtime and would crash with ENOENT).
+  if (process.env.VERCEL) {
+    return NextResponse.json(
+      {
+        error:
+          "URL fetch needs Vercel Sandbox, which needs OIDC federation enabled on this project. " +
+          "Vercel Dashboard → Project → Settings → Security → OIDC Federation → enable, then redeploy.",
+      },
+      { status: 502 },
+    );
+  }
+
+  // Local dev: use local yt-dlp.
   const res = await ingestYouTube(url);
   if ("error" in res) {
     return NextResponse.json(res, { status: 502 });
