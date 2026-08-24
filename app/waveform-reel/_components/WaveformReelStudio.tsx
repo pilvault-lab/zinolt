@@ -167,12 +167,12 @@ export const WaveformReelStudio: React.FC = () => {
       // fall back to the legacy multipart-body POST.
       const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 80);
       const pathname = `waveform-reel/uploads/${Date.now()}-${safeName}`;
-      stage(`starting Blob upload (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+      stage(`requesting Blob token (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
       let blobUrl: string | null = null;
+      let firstProgressSeen = false;
+      // 20s cap on the whole client-Blob flow. Anything longer and mobile
+      // users just see a frozen "starting" — better to fall back fast.
       try {
-        // 90s hard cap covers the whole flow: token mint + all chunks +
-        // finalization webhook. If we hit this, something's wrong on the
-        // Blob side and we should fall back rather than hang the UI.
         const blob = await Promise.race([
           blobUpload(pathname, file, {
             access: "public",
@@ -180,23 +180,37 @@ export const WaveformReelStudio: React.FC = () => {
             contentType: file.type || "audio/mpeg",
             multipart: true,
             onUploadProgress: (p) => {
+              if (!firstProgressSeen) {
+                firstProgressSeen = true;
+                stage("streaming chunks to Blob");
+              }
               setUploadPct(p.percentage);
               if (p.percentage >= 99.5) {
                 stage("waiting for Blob to finalize");
-              } else {
-                stage(`uploading to Blob (${Math.round(p.percentage)}%)`);
+              } else if (p.percentage > 0) {
+                stage(`streaming to Blob (${Math.round(p.percentage)}%)`);
               }
             },
           }),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("blob_upload_timeout_90s")), 90_000),
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    firstProgressSeen
+                      ? "blob_stall_after_progress"
+                      : "blob_never_started",
+                  ),
+                ),
+              20_000,
+            ),
           ),
         ]);
         blobUrl = blob.url;
         stage("Blob upload complete");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        stage(`Blob path failed (${msg.slice(0, 60)}) — falling back to server multipart`);
+        stage(`Blob path failed (${msg.slice(0, 60)}) — falling back to server`);
         blobUrl = null;
       }
 
