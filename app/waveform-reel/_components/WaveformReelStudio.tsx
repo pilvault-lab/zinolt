@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import { canRenderMediaOnWeb, renderMediaOnWeb } from "@remotion/web-renderer";
-import { upload as blobUpload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 import { Header } from "../../_components/Header";
@@ -21,7 +20,6 @@ import {
   type WaveformStyle,
 } from "@/remotion/waveform-reel/WaveformReel";
 import {
-  fetchAndDecode,
   analyzeMono,
   serializeAnalysis,
   type SerializedAnalysis,
@@ -37,15 +35,11 @@ const STYLE_OPTIONS: { id: WaveformStyle; label: string }[] = [
   { id: "orb-ring", label: "Orb Ring" },
 ];
 
-type Source =
-  | { kind: "none" }
-  | {
-      kind: "ready";
-      audioUrl: string;
-      source: "upload" | "youtube";
-      label: string;
-      key: string;
-    };
+type LoadedFile = {
+  objectUrl: string;
+  name: string;
+  fullDurationSec: number;
+};
 
 function toMono(audio: AudioBuffer): Float32Array {
   if (audio.numberOfChannels === 1) return audio.getChannelData(0).slice();
@@ -60,19 +54,39 @@ function toMono(audio: AudioBuffer): Float32Array {
   return out;
 }
 
-export const WaveformReelStudio: React.FC = () => {
-  const [inputMode, setInputMode] = useState<"upload" | "url">("upload");
-  const [ytUrl, setYtUrl] = useState("");
-  const [source, setSource] = useState<Source>({ kind: "none" });
-  const [isIngesting, setIsIngesting] = useState(false);
-  const [ingestError, setIngestError] = useState("");
+let sharedCtx: AudioContext | null = null;
+function getCtx(): AudioContext {
+  if (!sharedCtx) {
+    const AC =
+      (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext })
+        .AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) throw new Error("Web Audio API not supported in this browser");
+    sharedCtx = new AC();
+  }
+  return sharedCtx;
+}
 
+async function decodeFile(file: File): Promise<AudioBuffer> {
+  // Read bytes directly from the File object — no fetch, no network.
+  const buf = await file.arrayBuffer();
+  const ctx = getCtx();
+  return await new Promise<AudioBuffer>((resolve, reject) => {
+    // Callback form for Safari compatibility.
+    ctx.decodeAudioData(buf.slice(0), resolve, reject);
+  });
+}
+
+export const WaveformReelStudio: React.FC = () => {
+  const [loaded, setLoaded] = useState<LoadedFile | null>(null);
   const [monoBuf, setMonoBuf] = useState<{
     mono: Float32Array;
     sampleRate: number;
     fullDurationSec: number;
   } | null>(null);
+
   const [isDecoding, setIsDecoding] = useState(false);
+  const [decodeError, setDecodeError] = useState("");
 
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
@@ -120,25 +134,52 @@ export const WaveformReelStudio: React.FC = () => {
     };
   }, []);
 
-  // ------- Decode -------
-  const decode = useCallback(async (audioUrl: string) => {
+  // Revoke the object URL when the loaded file changes / on unmount so we
+  // don't leak the underlying blob memory (especially important for big video
+  // files where the bytes stay resident until URL.revokeObjectURL is called).
+  const prevObjectUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    return () => {
+      if (prevObjectUrlRef.current) {
+        URL.revokeObjectURL(prevObjectUrlRef.current);
+        prevObjectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const pickFile = useCallback(async (file: File) => {
+    setDecodeError("");
     setIsDecoding(true);
     setAnalysis(null);
     setMonoBuf(null);
+    // Revoke previous object URL if any.
+    if (prevObjectUrlRef.current) {
+      URL.revokeObjectURL(prevObjectUrlRef.current);
+      prevObjectUrlRef.current = null;
+    }
     try {
-      const audio = await fetchAndDecode(audioUrl);
+      const audio = await decodeFile(file);
       const mono = toMono(audio);
+      const objectUrl = URL.createObjectURL(file);
+      prevObjectUrlRef.current = objectUrl;
+      setLoaded({
+        objectUrl,
+        name: file.name,
+        fullDurationSec: audio.duration,
+      });
       setMonoBuf({
         mono,
         sampleRate: audio.sampleRate,
         fullDurationSec: audio.duration,
       });
+      // Default trim: first 30s max — long clips would eat several seconds of
+      // FFT analysis; user can widen after they see the scrubber.
       const end = Math.min(audio.duration, 30);
       setTrimStart(0);
       setTrimEnd(end);
     } catch (err) {
-      setIngestError(
-        "Failed to decode audio: " +
+      setDecodeError(
+        "Couldn't decode this file. Try a different format (mp3, m4a, mp4, mov, wav, webm). " +
           (err instanceof Error ? err.message : String(err)),
       );
     } finally {
@@ -146,170 +187,12 @@ export const WaveformReelStudio: React.FC = () => {
     }
   }, []);
 
-  // ------- Ingest -------
-  const [, setUploadPct] = useState(0);
-  const [ingestStage, setIngestStage] = useState("");
-  const ingestFile = useCallback(async (file: File) => {
-    setIngestError("");
-    setIsIngesting(true);
-    setUploadPct(0);
-    setIngestStage("");
-    const stage = (s: string) => {
-      setIngestStage(s);
-      console.log(`[wr ingest] ${s}`);
-    };
-    try {
-      // Try direct-to-Blob multipart upload first. `multipart: true` chunks
-      // the file into 8MB pieces uploaded in parallel — more resilient than
-      // single-shot upload and doesn't stall on the finalization webhook the
-      // way the previous non-multipart attempt did (hang at 94%). If Blob
-      // isn't configured (local dev without token) or the upload times out,
-      // fall back to the legacy multipart-body POST.
-      const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 80);
-      const pathname = `waveform-reel/uploads/${Date.now()}-${safeName}`;
-      stage(`requesting Blob token (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
-      let blobUrl: string | null = null;
-      let firstProgressSeen = false;
-      // 20s cap on the whole client-Blob flow. Anything longer and mobile
-      // users just see a frozen "starting" — better to fall back fast.
-      try {
-        const blob = await Promise.race([
-          blobUpload(pathname, file, {
-            access: "public",
-            handleUploadUrl: "/api/waveform-reel/upload-token",
-            contentType: file.type || "audio/mpeg",
-            multipart: true,
-            onUploadProgress: (p) => {
-              if (!firstProgressSeen) {
-                firstProgressSeen = true;
-                stage("streaming chunks to Blob");
-              }
-              setUploadPct(p.percentage);
-              if (p.percentage >= 99.5) {
-                stage("waiting for Blob to finalize");
-              } else if (p.percentage > 0) {
-                stage(`streaming to Blob (${Math.round(p.percentage)}%)`);
-              }
-            },
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    firstProgressSeen
-                      ? "blob_stall_after_progress"
-                      : "blob_never_started",
-                  ),
-                ),
-              20_000,
-            ),
-          ),
-        ]);
-        blobUrl = blob.url;
-        stage("Blob upload complete");
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        stage(`Blob path failed (${msg.slice(0, 60)}) — falling back to server`);
-        blobUrl = null;
-      }
-
-      let audioUrl: string;
-      let key: string;
-      if (blobUrl) {
-        stage("registering Blob URL");
-        const res = await fetch("/api/waveform-reel/audio", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ blobUrl, name: file.name }),
-        });
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(j.error || `register_${res.status}`);
-        }
-        const j = (await res.json()) as { audioUrl: string; key: string };
-        audioUrl = j.audioUrl;
-        key = j.key;
-      } else {
-        stage("uploading via server multipart (fallback)");
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/waveform-reel/audio", {
-          method: "POST",
-          body: fd,
-        });
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(j.error || `ingest_${res.status}`);
-        }
-        const j = (await res.json()) as { audioUrl: string; key: string };
-        audioUrl = j.audioUrl;
-        key = j.key;
-      }
-
-      stage("decoding audio");
-      setSource({
-        kind: "ready",
-        audioUrl,
-        source: "upload",
-        key,
-        label: file.name,
-      });
-      await decode(audioUrl);
-      stage("done");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[wr ingest] failed at "${ingestStage}":`, err);
-      setIngestError(`${msg} — see console for the stage that failed.`);
-    } finally {
-      setIsIngesting(false);
-      setUploadPct(0);
-    }
-  }, [decode, ingestStage]);
-
-  const ingestUrl = useCallback(async () => {
-    const url = ytUrl.trim();
-    if (!url) return;
-    setIngestError("");
-    setIsIngesting(true);
-    try {
-      const res = await fetch("/api/waveform-reel/audio", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || `ingest_${res.status}`);
-      }
-      const j = (await res.json()) as {
-        audioUrl: string;
-        source: "youtube";
-        key: string;
-        title?: string;
-      };
-      setSource({
-        kind: "ready",
-        audioUrl: j.audioUrl,
-        source: "youtube",
-        key: j.key,
-        label: j.title ?? url,
-      });
-      await decode(j.audioUrl);
-    } catch (err) {
-      setIngestError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsIngesting(false);
-    }
-  }, [ytUrl, decode]);
-
-  // ------- Analyze (debounced on trim changes) -------
+  // Analyze (debounced on trim changes) — FFT is CPU-heavy so we yield.
   useEffect(() => {
     if (!monoBuf) return;
     if (trimEnd <= trimStart) return;
     const timer = window.setTimeout(() => {
       setIsAnalyzing(true);
-      // Yield to the browser so the button re-renders before the sync loop.
       window.setTimeout(() => {
         try {
           const a = analyzeMono(monoBuf.mono, monoBuf.sampleRate, WR_FPS, {
@@ -326,11 +209,11 @@ export const WaveformReelStudio: React.FC = () => {
   }, [monoBuf, trimStart, trimEnd]);
 
   // Audio URL trimmed via #t=start,end so <MediaAudio> starts/stops in the
-  // right place inside the composition.
+  // right place inside the composition. Object URLs support media fragments.
   const trimmedAudioUrl = useMemo(() => {
-    if (source.kind !== "ready") return "";
-    return `${source.audioUrl}#t=${trimStart.toFixed(3)},${trimEnd.toFixed(3)}`;
-  }, [source, trimStart, trimEnd]);
+    if (!loaded) return "";
+    return `${loaded.objectUrl}#t=${trimStart.toFixed(3)},${trimEnd.toFixed(3)}`;
+  }, [loaded, trimStart, trimEnd]);
 
   const currentProps: WaveformReelProps = useMemo(
     () => ({
@@ -346,7 +229,7 @@ export const WaveformReelStudio: React.FC = () => {
 
   const handleDownload = useCallback(async () => {
     if (!analysis) {
-      setExportError("Load audio and pick trim first.");
+      setExportError("Pick a file and trim first.");
       return;
     }
     setExportError("");
@@ -402,7 +285,7 @@ export const WaveformReelStudio: React.FC = () => {
     }
   }, [analysis, currentProps, durationFrames]);
 
-  const ready = source.kind === "ready" && !!analysis;
+  const ready = !!loaded && !!analysis;
 
   return (
     <div
@@ -412,7 +295,7 @@ export const WaveformReelStudio: React.FC = () => {
       <Header />
 
       <div className="flex flex-col md:flex-1 md:min-h-0 md:flex-row">
-        {/* LEFT */}
+        {/* LEFT — inputs */}
         <aside
           className="flex flex-col gap-6 p-6 border-b md:overflow-y-auto md:w-[320px] md:border-b-0 md:border-r"
           style={{
@@ -420,7 +303,7 @@ export const WaveformReelStudio: React.FC = () => {
             borderColor: BRAND.colors.grey200,
           }}
         >
-          {/* Source toggle */}
+          {/* File picker */}
           <div className="flex flex-col gap-3">
             <span
               className="font-sans text-xs uppercase tracking-wide"
@@ -428,100 +311,54 @@ export const WaveformReelStudio: React.FC = () => {
             >
               Source
             </span>
-            <div className="flex gap-2">
-              {(["upload", "url"] as const).map((m) => {
-                const active = inputMode === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setInputMode(m)}
-                    className="flex-1 rounded-md border px-3 py-2 font-sans text-sm"
-                    style={{
-                      borderColor: active
-                        ? BRAND.colors.ink
-                        : BRAND.colors.grey200,
-                      backgroundColor: active ? BRAND.colors.ink : "#FFFFFF",
-                      color: active ? BRAND.colors.paper : BRAND.colors.ink,
-                    }}
-                  >
-                    {m === "upload" ? "Upload file" : "Paste URL"}
-                  </button>
-                );
-              })}
-            </div>
-
-            {inputMode === "upload" ? (
-              <label
-                className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-3 py-6 font-sans text-xs"
-                style={{
-                  borderColor: BRAND.colors.grey200,
-                  color: BRAND.colors.grey500,
+            <label
+              className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-3 py-6 font-sans text-xs"
+              style={{
+                borderColor: BRAND.colors.grey200,
+                color: BRAND.colors.grey500,
+              }}
+            >
+              <input
+                type="file"
+                accept="audio/*,video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) pickFile(f);
                 }}
-              >
-                <input
-                  type="file"
-                  accept="audio/*,video/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) ingestFile(f);
-                  }}
-                  disabled={isIngesting}
-                />
-                {isIngesting
-                  ? ingestStage || "Uploading…"
-                  : "Drop or choose audio / video"}
-              </label>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <input
-                  type="url"
-                  placeholder="https://youtube.com/watch?v=…"
-                  value={ytUrl}
-                  onChange={(e) => setYtUrl(e.target.value)}
-                  className="rounded-md border px-3 py-2 font-sans text-sm"
-                  style={{
-                    borderColor: BRAND.colors.grey200,
-                    backgroundColor: "#FFFFFF",
-                    color: BRAND.colors.ink,
-                  }}
-                />
-                <Button
-                  onClick={ingestUrl}
-                  disabled={isIngesting || !ytUrl.trim()}
-                  className="w-full font-sans"
-                >
-                  {isIngesting ? "Fetching audio…" : "Fetch YouTube audio"}
-                </Button>
-                <p
-                  className="font-sans text-[11px] leading-snug"
-                  style={{ color: BRAND.colors.grey500 }}
-                >
-                  Uses yt-dlp + your Firefox cookies. Cached by video ID.
-                </p>
-              </div>
-            )}
+                disabled={isDecoding}
+              />
+              {isDecoding
+                ? "Decoding audio…"
+                : "Drop or choose an audio / video file"}
+            </label>
+            <p
+              className="font-sans text-[11px] leading-snug"
+              style={{ color: BRAND.colors.grey500 }}
+            >
+              Anything the browser can decode: mp3, m4a, wav, mp4, mov, webm.
+              File never leaves your device.
+            </p>
 
-            {source.kind === "ready" && (
+            {loaded && (
               <p
                 className="truncate rounded-md border px-2 py-1 font-sans text-[11px]"
                 style={{
                   borderColor: BRAND.colors.grey200,
                   color: BRAND.colors.grey500,
                 }}
-                title={source.label}
+                title={loaded.name}
               >
-                Loaded: {source.label}
+                Loaded: {loaded.name}
               </p>
             )}
-            {ingestError && (
+            {decodeError && (
               <p
                 role="alert"
                 className="font-sans text-xs"
                 style={{ color: BRAND.colors.ink }}
               >
-                {ingestError}
+                {decodeError}
               </p>
             )}
           </div>
@@ -550,7 +387,7 @@ export const WaveformReelStudio: React.FC = () => {
                 style={{ color: BRAND.colors.grey500 }}
               >
                 {trimStart.toFixed(2)}s → {trimEnd.toFixed(2)}s
-                {isAnalyzing ? " · analyzing…" : isDecoding ? " · decoding…" : ""}
+                {isAnalyzing ? " · analyzing…" : ""}
               </p>
             </div>
           )}
@@ -570,9 +407,7 @@ export const WaveformReelStudio: React.FC = () => {
                   <button
                     key={o.id}
                     type="button"
-                    onClick={() =>
-                      setConfig((c) => ({ ...c, style: o.id }))
-                    }
+                    onClick={() => setConfig((c) => ({ ...c, style: o.id }))}
                     className="rounded-md border px-3 py-2 font-sans text-sm"
                     style={{
                       borderColor: active
@@ -768,7 +603,7 @@ export const WaveformReelStudio: React.FC = () => {
           </div>
         </aside>
 
-        {/* CENTER */}
+        {/* CENTER — player */}
         <main
           className="flex flex-1 items-center justify-center p-4 md:p-12"
           style={{ backgroundColor: "#5A5A60" }}
@@ -786,7 +621,7 @@ export const WaveformReelStudio: React.FC = () => {
           />
         </main>
 
-        {/* RIGHT */}
+        {/* RIGHT — download */}
         <aside
           className="flex flex-col gap-3 p-6 border-t md:border-t-0 md:border-l md:w-[260px]"
           style={{
@@ -809,8 +644,8 @@ export const WaveformReelStudio: React.FC = () => {
               className="font-sans text-xs leading-snug"
               style={{ color: BRAND.colors.grey500 }}
             >
-              {source.kind === "none"
-                ? "Load audio or a YouTube URL to start."
+              {!loaded
+                ? "Pick an audio or video file to start."
                 : isDecoding
                   ? "Decoding audio…"
                   : isAnalyzing
@@ -824,7 +659,8 @@ export const WaveformReelStudio: React.FC = () => {
               className="font-sans text-xs leading-snug"
               style={{ color: BRAND.colors.grey500 }}
             >
-              Exporting needs Chrome or Edge on desktop.
+              Exporting needs Chrome, Edge, or Safari 17+ on desktop or
+              iOS 17+.
             </p>
           )}
 
@@ -842,7 +678,8 @@ export const WaveformReelStudio: React.FC = () => {
             className="font-sans text-xs leading-snug"
             style={{ color: BRAND.colors.grey500 }}
           >
-            1080×1920 · 60fps · H.264 + AAC · audio muxed in.
+            1080×1920 · 60fps · H.264 + AAC · audio muxed in. All decoding
+            and rendering happens in your browser.
           </p>
         </aside>
       </div>
@@ -855,34 +692,33 @@ const Slider: React.FC<{
   min: number;
   max: number;
   step: number;
-  value: number;
+  value: number | undefined;
   onChange: (v: number) => void;
-}> = ({ label, min, max, step, value, onChange }) => (
-  <label className="flex flex-col gap-1">
-    <span
-      className="flex items-baseline justify-between font-sans text-xs"
-      style={{ color: BRAND.colors.grey500 }}
-    >
-      <span>{label}</span>
-      <span style={{ color: BRAND.colors.ink }}>
-        {step >= 1 ? value.toFixed(0) : value.toFixed(2)}
+}> = ({ label, min, max, step, value, onChange }) => {
+  const v = typeof value === "number" && Number.isFinite(value) ? value : min;
+  return (
+    <label className="flex flex-col gap-1">
+      <span
+        className="flex items-baseline justify-between font-sans text-xs"
+        style={{ color: BRAND.colors.grey500 }}
+      >
+        <span>{label}</span>
+        <span style={{ color: BRAND.colors.ink }}>
+          {step >= 1 ? v.toFixed(0) : v.toFixed(2)}
+        </span>
       </span>
-    </span>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-    />
-  </label>
-);
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={v}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    </label>
+  );
+};
 
-/**
- * Two-thumb range slider using a pair of native inputs stacked. Not the
- * prettiest but zero deps and precise. Values in seconds.
- */
 const TrimSlider: React.FC<{
   start: number;
   end: number;
