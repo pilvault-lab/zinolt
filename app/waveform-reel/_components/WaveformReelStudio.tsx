@@ -257,11 +257,13 @@ export const WaveformReelStudio: React.FC = () => {
         inputProps: { ...currentProps, forRender: true } as any,
         licenseKey: "free-license",
         videoCodec: "h264",
-        videoBitrate: 8_000_000,
+        videoBitrate: 12_000_000,
         audioCodec: "aac",
-        hardwareAcceleration: "no-preference",
+        audioBitrate: "high",
+        hardwareAcceleration: "prefer-hardware",
+        mediaCacheSizeInBytes: 256 * 1024 * 1024,
         keyframeIntervalInSeconds: 2,
-        delayRenderTimeoutInMilliseconds: 90_000,
+        delayRenderTimeoutInMilliseconds: 60_000,
         onProgress: ({ progress: p }) => setProgress(p),
       });
       const blob = await stripVideoMetadata(await getBlob());

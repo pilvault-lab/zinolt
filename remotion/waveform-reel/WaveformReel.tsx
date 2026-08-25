@@ -12,7 +12,7 @@ import {
 } from "@/lib/waveform-reel/analyze";
 import { OrbVisualizer } from "./OrbVisualizer";
 
-export const WR_FPS = 60;
+export const WR_FPS = 30;
 export const WR_WIDTH = 1080;
 export const WR_HEIGHT = 1920;
 /** House palette. Pure #000 so bloom fades edge-to-edge with no visible lift. */
