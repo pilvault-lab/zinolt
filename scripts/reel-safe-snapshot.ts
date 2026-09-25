@@ -17,10 +17,18 @@ async function main(): Promise<void> {
     timeout: 10 * 60_000,
   });
 
-  console.log("Installing ffmpeg-free…");
+  console.log("Installing static ffmpeg…");
   const ffmpeg = await sandbox.runCommand("sh", [
     "-c",
-    "sudo dnf install -y ffmpeg-free 2>&1",
+    [
+      "set -e",
+      "cd /tmp",
+      "curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
+      "mkdir -p ffmpeg-static && tar -xJf ffmpeg.tar.xz -C ffmpeg-static --strip-components=1",
+      "sudo mv ffmpeg-static/ffmpeg ffmpeg-static/ffprobe /usr/local/bin/",
+      "sudo chmod a+rx /usr/local/bin/ffmpeg /usr/local/bin/ffprobe",
+      "rm -rf ffmpeg.tar.xz ffmpeg-static",
+    ].join(" && ") + " 2>&1",
   ]);
   if (ffmpeg.exitCode !== 0) {
     console.error(await ffmpeg.stderr());

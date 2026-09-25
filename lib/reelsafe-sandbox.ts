@@ -4,11 +4,20 @@ import { Sandbox } from "@vercel/sandbox";
 import { get, put } from "@vercel/blob";
 import type { ReelSafeConfig, ReelSafeJobStatus } from "./reelsafe-types";
 
-// Amazon Linux 2023 (the Sandbox base image) ships ffmpeg-free in the default
-// enabled AppStream repo. It's LGPL-only but has everything we need
-// (libx264 encode, aac, silencedetect). Anything more exotic (nvenc, etc.) is
-// out of scope.
-const FFMPEG_INSTALL_CMD = "sudo dnf install -y ffmpeg-free 2>&1";
+// Static ffmpeg build from johnvansickle.com. We used to `dnf install
+// ffmpeg-free` from the AL2023 AppStream repo, but that path has been flaky
+// on Vercel Sandbox (silent exit 1). The static binary is smaller, faster to
+// install, and has no repo/mirror dependency. LGPL build — has everything we
+// need (libx264 encode, aac, silencedetect).
+const FFMPEG_INSTALL_CMD = [
+  "set -e",
+  "cd /tmp",
+  "curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
+  "mkdir -p ffmpeg-static && tar -xJf ffmpeg.tar.xz -C ffmpeg-static --strip-components=1",
+  "sudo mv ffmpeg-static/ffmpeg ffmpeg-static/ffprobe /usr/local/bin/",
+  "sudo chmod a+rx /usr/local/bin/ffmpeg /usr/local/bin/ffprobe",
+  "rm -rf ffmpeg.tar.xz ffmpeg-static",
+].join(" && ") + " 2>&1";
 
 const SANDBOX_WORK_DIR = "/work";
 // 45 min max — long enough for a real 20-30 min render + upload with headroom.

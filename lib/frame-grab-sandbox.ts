@@ -15,7 +15,19 @@ import { Sandbox } from "@vercel/sandbox";
  * REEL_SAFE_SANDBOX_SNAPSHOT_ID).
  */
 
-const FFMPEG_INSTALL_CMD = "sudo dnf install -y ffmpeg-free 2>&1";
+// Static ffmpeg build from johnvansickle.com — a single self-contained tarball.
+// We used to `dnf install ffmpeg-free`, but the AL2023 AppStream repo state on
+// Vercel Sandbox has been flaky (silent exit 1). The static binary is smaller,
+// faster to install, and has no repo/mirror dependency.
+const FFMPEG_INSTALL_CMD = [
+  "set -e",
+  "cd /tmp",
+  "curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
+  "mkdir -p ffmpeg-static && tar -xJf ffmpeg.tar.xz -C ffmpeg-static --strip-components=1",
+  "sudo mv ffmpeg-static/ffmpeg ffmpeg-static/ffprobe /usr/local/bin/",
+  "sudo chmod a+rx /usr/local/bin/ffmpeg /usr/local/bin/ffprobe",
+  "rm -rf ffmpeg.tar.xz ffmpeg-static",
+].join(" && ") + " 2>&1";
 // yt-dlp_linux is a self-contained binary (bundled Python). ffmpeg is still
 // required for the merge step of separate video+audio streams.
 const YTDLP_INSTALL_CMD =
