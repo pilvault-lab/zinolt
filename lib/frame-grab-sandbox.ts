@@ -20,9 +20,14 @@ import { Sandbox } from "@vercel/sandbox";
 // Vercel Sandbox has been flaky (silent exit 1). The static binary is smaller,
 // faster to install, and has no repo/mirror dependency.
 const FFMPEG_INSTALL_CMD = [
-  "set -e",
+  "set -eux",
+  // xz-utils isn't guaranteed on the AL2023 base image; the johnvansickle
+  // tarball is .tar.xz so we need it. Cheap install (~100kb).
+  "command -v xz >/dev/null 2>&1 || sudo dnf install -y xz",
   "cd /tmp",
-  "curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
+  // -f: fail on HTTP errors instead of writing an empty file that then breaks
+  // tar with a confusing exit 2.
+  "curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
   "mkdir -p ffmpeg-static && tar -xJf ffmpeg.tar.xz -C ffmpeg-static --strip-components=1",
   "sudo mv ffmpeg-static/ffmpeg ffmpeg-static/ffprobe /usr/local/bin/",
   "sudo chmod a+rx /usr/local/bin/ffmpeg /usr/local/bin/ffprobe",

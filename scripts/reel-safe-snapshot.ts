@@ -21,9 +21,10 @@ async function main(): Promise<void> {
   const ffmpeg = await sandbox.runCommand("sh", [
     "-c",
     [
-      "set -e",
+      "set -eux",
+      "command -v xz >/dev/null 2>&1 || sudo dnf install -y xz",
       "cd /tmp",
-      "curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
+      "curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz",
       "mkdir -p ffmpeg-static && tar -xJf ffmpeg.tar.xz -C ffmpeg-static --strip-components=1",
       "sudo mv ffmpeg-static/ffmpeg ffmpeg-static/ffprobe /usr/local/bin/",
       "sudo chmod a+rx /usr/local/bin/ffmpeg /usr/local/bin/ffprobe",
