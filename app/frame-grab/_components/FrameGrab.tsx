@@ -156,6 +156,12 @@ export function FrameGrab() {
   const [zipping, setZipping] = useState(false);
   const [pushingToHype, setPushingToHype] = useState(false);
 
+  // Blob paths of everything the current session has created. Used to clean up
+  // when a new video is picked, a new job starts, or the tab closes — Blob
+  // storage is a Hobby-plan 1 GB scratch disk, not durable storage.
+  const dirtyUploads = useRef<Set<string>>(new Set());
+  const dirtyJobIds = useRef<Set<string>>(new Set());
+
   // VideoStage hooks — VideoStage registers these callbacks with us.
   const grabRef = useRef<() => number | null>(() => null);
   const seekRef = useRef<(sec: number) => void>(() => {});
@@ -167,11 +173,58 @@ export function FrameGrab() {
     async () => null,
   );
 
+  // Fire-and-forget Blob cleanup. Used when a new upload/extract obsoletes
+  // the previous set, and on tab unload as a last resort.
+  const cleanup = useCallback(
+    (opts: { pathnames?: string[]; jobIds?: string[]; useBeacon?: boolean }) => {
+      const pathnames = opts.pathnames ?? [];
+      const prefixes = (opts.jobIds ?? []).map((j) => `frame-grab/jobs/${j}/`);
+      if (pathnames.length === 0 && prefixes.length === 0) return;
+      const body = JSON.stringify({ pathnames, prefixes });
+      if (opts.useBeacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
+        navigator.sendBeacon(
+          "/api/frame-grab/cleanup",
+          new Blob([body], { type: "application/json" }),
+        );
+        return;
+      }
+      void fetch("/api/frame-grab/cleanup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    },
+    [],
+  );
+
+  // Drop everything created this session when the tab closes. Best-effort via
+  // sendBeacon — not guaranteed to run, but catches the common case.
+  useEffect(() => {
+    const onUnload = () => {
+      const pathnames = Array.from(dirtyUploads.current);
+      const jobIds = Array.from(dirtyJobIds.current);
+      if (pathnames.length === 0 && jobIds.length === 0) return;
+      cleanup({ pathnames, jobIds, useBeacon: true });
+    };
+    window.addEventListener("pagehide", onUnload);
+    return () => window.removeEventListener("pagehide", onUnload);
+  }, [cleanup]);
+
   const load = useCallback(async () => {
     setError(null);
     setLoaded(null);
     setResult(null);
     setMarkers([]);
+    // A previous URL-loaded (YouTube) source or upload is now dead — sweep it
+    // along with any of its clips before we fetch another one.
+    const staleUploads = Array.from(dirtyUploads.current);
+    const staleJobIds = Array.from(dirtyJobIds.current);
+    if (staleUploads.length > 0 || staleJobIds.length > 0) {
+      cleanup({ pathnames: staleUploads, jobIds: staleJobIds });
+      dirtyUploads.current.clear();
+      dirtyJobIds.current.clear();
+    }
     if (pickedBlobUrl) {
       URL.revokeObjectURL(pickedBlobUrl);
       setPickedBlobUrl(null);
@@ -204,13 +257,16 @@ export function FrameGrab() {
         setError(msg);
         return;
       }
-      setLoaded(json as unknown as ResolveResponse);
+      const resolved = json as unknown as ResolveResponse;
+      setLoaded(resolved);
+      // Track YouTube-fetched source video so we clean it up later.
+      if (resolved.sourcePathname) dirtyUploads.current.add(resolved.sourcePathname);
     } catch (e) {
       setError(e instanceof Error ? e.message : "load_failed");
     } finally {
       setLoading(false);
     }
-  }, [source, pickedBlobUrl]);
+  }, [source, pickedBlobUrl, cleanup]);
 
   // Native picker: play instantly (blob URL) + stream-upload to Vercel Blob
   // in the background. Client-upload flow — the file goes direct from browser
@@ -221,6 +277,15 @@ export function FrameGrab() {
     setResult(null);
     setMarkers([]);
     setLoaded(null);
+    // Any previous upload + its clips are now dead weight — sweep them from
+    // Blob before uploading the replacement.
+    const staleUploads = Array.from(dirtyUploads.current);
+    const staleJobIds = Array.from(dirtyJobIds.current);
+    if (staleUploads.length > 0 || staleJobIds.length > 0) {
+      cleanup({ pathnames: staleUploads, jobIds: staleJobIds });
+      dirtyUploads.current.clear();
+      dirtyJobIds.current.clear();
+    }
     if (pickedBlobUrl) URL.revokeObjectURL(pickedBlobUrl);
     const objectUrl = URL.createObjectURL(file);
     setPickedBlobUrl(objectUrl);
@@ -253,6 +318,7 @@ export function FrameGrab() {
     })
       .then((blob) => {
         setUpload({ phase: "done", name: file.name, blobUrl: blob.url, pathname: blob.pathname });
+        dirtyUploads.current.add(blob.pathname);
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "upload_network_error";
@@ -390,6 +456,13 @@ export function FrameGrab() {
     setResult(null);
     setHiddenClips(new Set());
     setExtracting(true);
+    // Whatever clips the previous extract dropped in Blob are now dead —
+    // clear them before the new job writes on top.
+    const staleJobIds = Array.from(dirtyJobIds.current);
+    if (staleJobIds.length > 0) {
+      cleanup({ jobIds: staleJobIds });
+      dirtyJobIds.current.clear();
+    }
     try {
       const body: Record<string, unknown> = {
         mode,
@@ -417,7 +490,9 @@ export function FrameGrab() {
         setError(typeof json?.error === "string" ? json.error : `HTTP ${res.status}`);
         return;
       }
-      setResult(json as FrameGrabResponse);
+      const typed = json as FrameGrabResponse;
+      setResult(typed);
+      if (typed.sourceId) dirtyJobIds.current.add(typed.sourceId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "extract_failed");
     } finally {
@@ -435,6 +510,7 @@ export function FrameGrab() {
     pickMode,
     rows,
     buildMoments,
+    cleanup,
   ]);
 
   // Nudge a rendered clip: re-extract just that timestamp ±0.1s.
